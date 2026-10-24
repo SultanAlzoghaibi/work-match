@@ -8,4 +8,5 @@ triple="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
 triple="${triple:-$(uname -m | sed 's/arm64/aarch64/')-apple-darwin}"
 mkdir -p bin
 cp .build/release/wm-ocr "bin/wm-ocr-$triple"
-echo "built bin/wm-ocr-$triple"
+cp .build/release/wm-ocr "../src-tauri/binaries/wm-ocr-$triple"   # the app's sidecar (screen_capture.rs)
+echo "built bin/wm-ocr-$triple and src-tauri/binaries/wm-ocr-$triple"

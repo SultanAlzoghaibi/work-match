@@ -260,6 +260,11 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     summarizer::start(app.handle().clone());
     // Which app / window is in front, while sharing is on (collecting_data/).
     collecting_data::app_tracker::start(app.handle().clone());
+    // Like the extension's capture server: the second dev instance (yarn dev2 /
+    // prod2) shares this screen, so only the first one reads it.
+    if !std::env::var("WORKMATCH_NO_CAPTURE").is_ok_and(|value| value == "1") {
+        collecting_data::screen_capture::start(app.handle().clone());
+    }
     Ok(())
 }
 

@@ -70,6 +70,20 @@ touch binaries/llama-server-aarch64-apple-darwin                                
 
 `build-llama-server.sh` and `build-llama-server.ps1` already give their output a fresh timestamp.
 
+## wm-ocr (screen text)
+
+`wm-ocr` is the Swift screen reader in `tauri/ocr-helper`. `screen_capture.rs` runs it on
+the front window and feeds the text to the summarizer. Build it with:
+
+```sh
+sh ../../ocr-helper/build.sh     # -> wm-ocr-aarch64-apple-darwin (also in ocr-helper/bin)
+```
+
+Without it the app still builds (`build.rs` puts an empty placeholder here) and logs that
+it isn't reading the screen. It needs the **Screen Recording** permission: in `tauri dev`
+macOS asks for it on behalf of your terminal or editor, in a bundled build on behalf of
+the app.
+
 ## Model
 
 The model isn't downloaded automatically. Put one of these in the app data folder under

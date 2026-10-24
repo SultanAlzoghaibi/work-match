@@ -18,7 +18,7 @@ PRAGMA journal_mode = DELETE;
 CREATE TABLE IF NOT EXISTS captures (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     captured_at INTEGER NOT NULL,          -- unix ms, from server receive time
-    source      TEXT    NOT NULL,          -- 'chrome' (later: 'ocr')
+    source      TEXT    NOT NULL,          -- 'chrome' (extension) or 'screen' (screen_capture.rs)
     host        TEXT    NOT NULL,
     path        TEXT    NOT NULL,
     title       TEXT    NOT NULL,
@@ -48,6 +48,8 @@ pub struct NewCapture<'a> {
 pub struct Capture {
     pub id: i64,
     pub captured_at: i64,
+    /// 'chrome' or 'screen'. For 'screen', host is the app name and title the window title.
+    pub source: String,
     pub host: String,
     pub path: String,
     pub title: String,
@@ -110,19 +112,33 @@ impl Buffer {
         Ok(true)
     }
 
+    /// Whether `source` stored anything since `since_ms`. screen_capture.rs
+    /// skips Chrome while the extension is sending pages.
+    pub fn has_recent(&self, source: &str, since_ms: i64) -> bool {
+        self.conn()
+            .query_row(
+                "SELECT 1 FROM captures WHERE source = ?1 AND captured_at >= ?2 LIMIT 1",
+                params![source, since_ms],
+                |_| Ok(()),
+            )
+            .optional()
+            .is_ok_and(|row| row.is_some())
+    }
+
     pub fn read_all(&self) -> rusqlite::Result<Vec<Capture>> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, captured_at, host, path, title, text FROM captures ORDER BY captured_at, id",
+            "SELECT id, captured_at, source, host, path, title, text FROM captures ORDER BY captured_at, id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(Capture {
                 id: row.get(0)?,
                 captured_at: row.get(1)?,
-                host: row.get(2)?,
-                path: row.get(3)?,
-                title: row.get(4)?,
-                text: row.get(5)?,
+                source: row.get(2)?,
+                host: row.get(3)?,
+                path: row.get(4)?,
+                title: row.get(5)?,
+                text: row.get(6)?,
             })
         })?;
         rows.collect()

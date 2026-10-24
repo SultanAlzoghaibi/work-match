@@ -53,7 +53,8 @@
     "active": true,
     "targets": "all",
     "externalBin": [
-      "binaries/llama-server"
+      "binaries/llama-server",
+      "binaries/wm-ocr"
     ],
     "icon": [
       "icons/32x32.png",

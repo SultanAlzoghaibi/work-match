@@ -12,6 +12,14 @@ The screenshot stays in memory and is never written to disk. Requires macOS 14+.
 ./build.sh          # -> bin/wm-ocr-<target-triple>, the name Tauri sidecars need
 ```
 
+## Test
+
+```sh
+./test.sh   # builds, then checks columns, secret redaction and errors on rendered test images
+```
+
+No Screen Recording permission is needed: the checks run on images, not your screen.
+
 ## Use
 
 ```sh
@@ -20,6 +28,7 @@ wm-ocr --no-correction                   # recommended: language correction mang
 wm-ocr --fast                            # ~10x faster, less accurate
 wm-ocr --skip-bundle com.apple.MobileSMS,com.apple.mail   # blocklist, checked before capture
 wm-ocr --image shot.png                  # OCR a file instead (testing, no permission needed)
+wm-ocr --app com.apple.TextEdit          # capture that app's top window, even in the background
 wm-ocr --request-permission              # trigger the Screen Recording prompt
 ```
 
@@ -40,11 +49,32 @@ Output (one JSON object on stdout):
 ```
 
 - `lines`: every recognized line, with position as fractions of the image (top-left origin).
-- `main_text`: lines in reading order, without low-confidence noise or the title/status bar bands. Send this to the summarizer.
-- `skipped: true`: the frontmost app was on the `--skip-bundle` list; nothing was captured.
+- `columns`: side-by-side text areas (sidebar, editor, chat panel), largest first, each read top to bottom.
+- `main_text`: the columns joined in that order, without low-confidence noise or the title/status bar bands. Send this to the summarizer.
+- `skipped: true`: nothing was captured. `skip_reason` is `blocklist` (the app was in `--skip-bundle`) or `sensitive_window` (the title looks like `.env`, `credentials`, `id_rsa`, a `.pem` file, a keychain or a password manager).
+- `redactions`: how many secrets were replaced with `[redacted]`.
+
+## Browsers
+
+For Chrome, Safari, Arc, Brave, Edge and Firefox, text in the top 130 points of the
+window (tabs, address bar, bookmarks) is dropped from every output field. It's noise for
+the summarizer and can name private tabs.
+
+## Secrets
+
+Before anything is printed, URL passwords (`postgresql://user:pw@...`), `password=` / `token:` / `api_key=` style values, private key headers, and known token shapes (OpenAI/OpenRouter `sk-`, Supabase `sb_secret_`, AWS `AKIA`, GitHub `ghp_`, Slack `xox`, Google `AIza`, JWTs, and long random strings) are replaced with `[redacted]`. Tested on an image of fake secrets: all replaced, normal code and URLs left alone.
 
 Errors print `{"error": "...", "message": "..."}` and exit non-zero:
 `1` bad arguments/image, `2` no Screen Recording permission, `3` no window, `4` capture/OCR failed.
+
+## Checked on real apps (M4, macOS 26)
+
+Captured with `--app` in the background, so focus never changed:
+
+| Window | Result |
+|---|---|
+| TextEdit, a known homework note with Python code | 96% of words read; "Bellman-Ford", "priority queue" found |
+| Safari, Wikipedia "Dijkstra's algorithm" | Article text read; address bar, Favorites bar and tab names removed |
 
 ## Measured (M-series, macOS 26)
 
@@ -53,6 +83,8 @@ Errors print `{"error": "...", "message": "..."}` and exit non-zero:
 | Photo, 1512×2016 | accurate | ~0.9 s (first run includes model load) |
 | Photo, 1512×2016 | fast | ~70 ms |
 | Code screenshot, 1400×800 | accurate, `--no-correction` | ~0.2 s |
+| Live window, first capture after a while | accurate | ~7 s (Vision loads its model) |
+| Live window, after that | accurate | ~0.6 s |
 
 ## Permission
 

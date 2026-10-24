@@ -1,12 +1,13 @@
 fn main() {
     ensure_sidecar_exists("llama-server");
+    ensure_sidecar_exists("wm-ocr");
     tauri_build::build()
 }
 
 /// tauri-build refuses to build when an externalBin file is missing, and the
-/// llama-server sidecar isn't committed (see binaries/README.md). An empty
-/// stand-in keeps the app building; at runtime llm.rs sees it is empty, logs
-/// it, and summaries use the fallback.
+/// sidecars aren't committed (see binaries/README.md). An empty stand-in keeps
+/// the app building; at runtime llm.rs / screen_capture.rs see it is empty,
+/// log it, and carry on without it.
 fn ensure_sidecar_exists(name: &str) {
     let target = std::env::var("TARGET").unwrap();
     let exe = if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
@@ -19,7 +20,7 @@ fn ensure_sidecar_exists(name: &str) {
         return;
     }
     println!(
-        "cargo:warning={} is missing or an empty placeholder: summaries will use the fallback (see src-tauri/binaries/README.md)",
+        "cargo:warning={} is missing or an empty placeholder (see src-tauri/binaries/README.md)",
         path.display()
     );
     if !path.exists() {

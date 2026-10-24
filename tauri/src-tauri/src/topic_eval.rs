@@ -64,6 +64,7 @@ fn inputs(case: &Case) -> (Vec<Capture>, Vec<AppSession>) {
         .enumerate()
         .map(|(i, page)| Capture {
             id: i as i64 + 1,
+            source: "chrome".into(),
             captured_at: NOW - 60_000 * (case.pages.len() - i) as i64,
             host: page.host.clone(),
             path: page.path.clone(),
