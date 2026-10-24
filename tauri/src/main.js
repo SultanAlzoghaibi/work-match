@@ -91,9 +91,10 @@ function matchLine(match) {
   return best ? `No match: best was ${best.name} at ${best.score.toFixed(2)} (needs 0.80).` : "No match.";
 }
 
-/// A task search: clicking a task button shares it and keeps searching,
-/// re-pushing every PUSH_EVERY_MS (like the real app's 5-minute summaries)
-/// until the user presses Stop or a match is found.
+/// A pretend activity: clicking a task button behaves like the real 5-minute
+/// summaries (summarizer.rs), pushing a new random example of that task every
+/// PUSH_EVERY_MS until Stop. Like the real pipeline it keeps going after a
+/// match; the backend's match cooldown keeps it from re-matching the same person.
 const PUSH_EVERY_MS = 5 * 60 * 1000;
 
 let session = null; // { kind, summary, topic, filters, nextPushAt, pushing }
@@ -105,7 +106,7 @@ function startSession(kind, filters) {
   const task = MOCK_TASKS[kind];
   session = {
     kind,
-    summary: randomSummary(kind),
+    summary: null, // picked fresh on every push
     topic: task.topic,
     filters,
     nextPushAt: Date.now(),
@@ -117,18 +118,15 @@ function startSession(kind, filters) {
   tickSession();
 }
 
-/// Stop searching. Stop / Quit also remove the task from the backend; a match
-/// keeps it, so the other person still sees what you're working on.
-async function endSession(message, { keepTask = false } = {}) {
+/// Stop searching. Stop / Quit also remove the task from the backend.
+async function endSession(message) {
   clearInterval(sessionTimer);
   session = null;
   lastPush = { ended: message };
-  if (!keepTask) {
-    try {
-      await clearTask(MOCK_USER_ID);
-    } catch (err) {
-      lastPush = { error: `Couldn't remove the task: ${err.message}` };
-    }
+  try {
+    await clearTask(MOCK_USER_ID);
+  } catch (err) {
+    lastPush = { error: `Couldn't remove the task: ${err.message}` };
   }
   updateTaskUi();
 }
@@ -140,16 +138,11 @@ async function tickSession() {
     const current = session;
     current.pushing = true;
     current.nextPushAt = now + PUSH_EVERY_MS;
+    current.summary = randomSummary(current.kind, current.summary);
     try {
       const saved = await pushTask(MOCK_USER_ID, current.summary, current.topic, current.filters);
       if (session === current) {
         lastPush = { summary: saved.task_summary, topic: saved.topic, match: saved.match };
-        if (saved.match.match_id != null) {
-          await endSession(`Match found with ${saved.match.other_name}: answer the popup. Searching stopped.`, {
-            keepTask: true,
-          });
-          return;
-        }
       }
     } catch (err) {
       if (session === current) lastPush = { error: `Couldn't push: ${err.message}` };
@@ -160,12 +153,16 @@ async function tickSession() {
   updateTaskUi();
 }
 
-// The other person's push can create the match too: stop searching as soon
-// as a new, unanswered match reaches this app (Rust's 3 s poll).
+// The other person's push can create the match too: show it in the status
+// line as soon as it reaches this app (Rust's 3 s poll). Pushing continues.
 listen("match-state", (event) => {
   const view = event.payload;
-  if (session && view.my_status === "pending" && !view.expired) {
-    endSession(`Match found with ${view.other.name}: answer the popup. Searching stopped.`, { keepTask: true });
+  if (session && lastPush?.match && view.my_status === "pending" && !view.expired) {
+    lastPush = {
+      ...lastPush,
+      match: { match_id: view.match_id, other_name: view.other.name, scores: [{ score: view.score ?? 0 }] },
+    };
+    updateTaskUi();
   }
 });
 
@@ -236,7 +233,7 @@ function renderTaskDemo() {
     "div",
     { class: "task-demo" },
     el("h3", { class: "section-title" }, "Find someone now"),
-    el("span", { class: "label" }, "Share a task and search until matched (demo)"),
+    el("span", { class: "label" }, "Pretend to work on a task: a new example every 5 min until Stop (demo)"),
     el("div", { class: "task-buttons" }, ...buttons, taskUi.stopButton),
     taskUi.countdown,
     taskUi.status,

@@ -27,7 +27,9 @@ export const MOCK_TASKS = {
   },
 };
 
-export function randomSummary(kind) {
-  const { summaries } = MOCK_TASKS[kind];
-  return summaries[Math.floor(Math.random() * summaries.length)];
+/// A random summary for `kind`, different from `previous` when possible, so
+/// each 5-minute push reads like a fresh summary of the same activity.
+export function randomSummary(kind, previous = null) {
+  const choices = MOCK_TASKS[kind].summaries.filter((summary) => summary !== previous);
+  return choices[Math.floor(Math.random() * choices.length)];
 }
