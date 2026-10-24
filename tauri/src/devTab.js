@@ -72,6 +72,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
     listening: [true, "listening on 127.0.0.1:47321"],
     failed: [false, "port 47321 is taken: another instance is capturing; restart this one first"],
     starting: [null, "starting…"],
+    disabled: [null, "off in this instance (dev2 / prod2): run instance 1 for real Chrome capture"],
   }[status.capture_server];
   return section(
     "Status",

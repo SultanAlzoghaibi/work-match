@@ -75,8 +75,15 @@ pub fn listening_status() -> &'static str {
     match LISTENING.load(std::sync::atomic::Ordering::Relaxed) {
         1 => "listening",
         2 => "failed",
+        3 => "disabled",
         _ => "starting",
     }
+}
+
+/// This instance doesn't capture (WORKMATCH_NO_CAPTURE=1, the second dev instance).
+pub fn disable() {
+    LISTENING.store(3, std::sync::atomic::Ordering::Relaxed);
+    println!("[capture] disabled for this instance (WORKMATCH_NO_CAPTURE=1)");
 }
 
 /// Serves on 127.0.0.1 only, never on other interfaces.

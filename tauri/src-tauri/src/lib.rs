@@ -234,7 +234,13 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     let sharing = sharing::Sharing::new(db::load_sharing_enabled(app.handle()).unwrap_or(false));
 
     buffer::start_sweeper(buffer.clone());
-    capture_server::start(buffer.clone(), sharing.clone());
+    // Only one app can own the extension's port. The second dev instance
+    // (yarn dev2 / prod2) is for demo buttons, so it never claims it.
+    if std::env::var("WORKMATCH_NO_CAPTURE").is_ok_and(|value| value == "1") {
+        capture_server::disable();
+    } else {
+        capture_server::start(buffer.clone(), sharing.clone());
+    }
     app.manage(collecting_data::dev::DevState::default());
     app.manage(buffer);
     app.manage(sharing);
