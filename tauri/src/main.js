@@ -78,6 +78,8 @@ listen("friend-finding", (event) => {
     if (button.isConnected) paintFriendButton(button);
     else friendButtons.delete(button);
   }
+  // Turning friend finding off (tray or button) also stops a demo task search.
+  if (!friendFinding && session) endSession("Friend finding turned off: stopped searching.");
 });
 
 // --- Demo task push ---------------------------------------------------------
@@ -145,6 +147,8 @@ async function ensureSharing() {
 
 async function startSession(kind, filters) {
   await ensureSharing().catch((err) => console.warn("couldn't turn sharing on", err));
+  // A demo search is friend finding: turn it on so the tray planet animates.
+  if (!friendFinding) invoke("set_friend_finding", { enabled: true }).catch(console.error);
   const task = MOCK_TASKS[kind];
   session = {
     kind,
@@ -164,6 +168,7 @@ async function startSession(kind, filters) {
 async function endSession(message) {
   clearInterval(sessionTimer);
   session = null;
+  if (friendFinding) invoke("set_friend_finding", { enabled: false }).catch(console.error);
   lastPush = { ended: message };
   try {
     await clearTask(MOCK_USER_ID);
