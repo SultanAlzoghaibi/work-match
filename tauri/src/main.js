@@ -100,7 +100,37 @@ const PUSH_EVERY_MS = 5 * 60 * 1000;
 let session = null; // { kind, summary, topic, filters, nextPushAt, pushing }
 let lastPush = null; // { summary, topic, match } from the latest push, or { error } / { ended }
 let sessionTimer = null;
-const taskUi = { status: null, matchStatus: null, countdown: null, stopButton: null };
+const taskUi = { status: null, matchStatus: null, countdown: null, stopButton: null, pushNote: null };
+
+/// "Push now": don't wait for the 5-minute timer. A running demo task pushes
+/// its next example (and restarts the timer); otherwise the real summarizer
+/// summarizes the last 5 minutes of activity and pushes that.
+async function pushNow() {
+  const note = (text) => {
+    if (taskUi.pushNote) taskUi.pushNote.textContent = text;
+  };
+  if (session) {
+    if (session.pushing) return;
+    session.nextPushAt = 0;
+    note("Pushing the next example now…");
+    await tickSession();
+    note("");
+    return;
+  }
+  note("Summarizing your last 5 minutes…");
+  try {
+    const summary = await invoke("summarize_now");
+    note(
+      summary.shareable
+        ? `Pushed: ${summary.topic}: ${summary.task_summary}`
+        : summary.source === "idle"
+          ? "Nothing was captured in the last 5 minutes."
+          : "Nothing shareable in the last 5 minutes, so nothing was pushed.",
+    );
+  } catch (err) {
+    note(`Couldn't summarize: ${err}`);
+  }
+}
 
 function startSession(kind, filters) {
   const task = MOCK_TASKS[kind];
@@ -226,6 +256,7 @@ function renderTaskDemo() {
     { class: "link", onclick: () => endSession("Stopped searching: your task was removed.") },
     "Stop",
   );
+  taskUi.pushNote = el("p", { class: "task-status" });
   taskUi.countdown = el("p", { class: "task-status muted" });
   taskUi.status = el("p", { class: "task-status muted" });
   taskUi.matchStatus = el("p", { class: "task-status muted" });
@@ -234,7 +265,14 @@ function renderTaskDemo() {
     { class: "task-demo" },
     el("h3", { class: "section-title" }, "Find someone now"),
     el("span", { class: "label" }, "Pretend to work on a task: a new example every 5 min until Stop (demo)"),
-    el("div", { class: "task-buttons" }, ...buttons, taskUi.stopButton),
+    el(
+      "div",
+      { class: "task-buttons" },
+      ...buttons,
+      el("button", { class: "primary", title: "Push now instead of waiting for the 5-minute timer", onclick: pushNow }, "⚡ Push now"),
+      taskUi.stopButton,
+    ),
+    taskUi.pushNote,
     taskUi.countdown,
     taskUi.status,
     taskUi.matchStatus,

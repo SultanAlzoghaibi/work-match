@@ -132,12 +132,7 @@ pub fn start(app: AppHandle) {
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         loop {
             ticker.tick().await;
-            // Apps in front during this window (collecting_data/app_tracker.rs).
-            let since = buffer::now_ms() - i64::from(window_minutes) * 60_000;
-            let apps = db_path
-                .as_deref()
-                .map(|path| app_tracker::recent_sessions(path, since))
-                .unwrap_or_default();
+            let apps = recent_apps(db_path.as_deref(), window_minutes);
             if let Some(summary) =
                 run_once(&buffer, &sharing, &llm, &apps, &mut previous_topic, window_minutes).await
             {
@@ -146,6 +141,36 @@ pub fn start(app: AppHandle) {
             }
         }
     });
+}
+
+/// Apps in front during the last window (collecting_data/app_tracker.rs).
+fn recent_apps(db_path: Option<&std::path::Path>, window_minutes: u32) -> Vec<AppSession> {
+    let since = buffer::now_ms() - i64::from(window_minutes) * 60_000;
+    db_path
+        .map(|path| app_tracker::recent_sessions(path, since))
+        .unwrap_or_default()
+}
+
+/// "Push now" in the app: summarize the last 5 minutes right away instead of
+/// waiting for the timer, then push it like a scheduled summary would.
+#[tauri::command]
+pub async fn summarize_now(app: AppHandle) -> Result<ActivitySummary, String> {
+    let buffer = app.state::<Buffer>().inner().clone();
+    let sharing = app.state::<Sharing>().inner().clone();
+    let llm = app.state::<Llm>().inner().clone();
+    if !sharing.is_on() {
+        return Err("Share my activity is off: turn it on in the tray menu".into());
+    }
+    const WINDOW_MINUTES: u32 = 5;
+    println!("[summarizer] summarize now (requested from the app)");
+    let mut previous_topic = last_shareable_topic(&buffer).map(|topic| (sharing.epoch(), topic));
+    let apps = recent_apps(crate::db::get_db_path(&app).as_deref(), WINDOW_MINUTES);
+    let summary = run_once(&buffer, &sharing, &llm, &apps, &mut previous_topic, WINDOW_MINUTES)
+        .await
+        .ok_or("sharing was turned off while summarizing")?;
+    let _ = app.emit("activity-summary", &summary);
+    crate::api::on_summary(&app, &summary);
+    Ok(summary)
 }
 
 /// One summary of everything buffered, or None if sharing is off or was

@@ -205,6 +205,7 @@ pub fn run() {
             sharing::get_sharing,
             sharing::set_sharing,
             summarizer::get_last_summary,
+            summarizer::summarize_now,
             collecting_data::app_tracker::get_app_sessions,
         ])
         .build(tauri::generate_context!())
