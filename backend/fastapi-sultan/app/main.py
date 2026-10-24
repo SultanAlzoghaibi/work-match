@@ -182,6 +182,7 @@ select m.id as match_id, m.topic, m.score, m.created_at,
        ('declined' not in (m.a_status, m.b_status)
         and 'pending' in (m.a_status, m.b_status)
         and m.created_at < now() - interval '2 minutes') as expired,
+       m.room_id,
        case when m.user_a = %(me)s then m.a_keep else m.b_keep end as my_keep,
        case when m.user_a = %(me)s then m.b_keep else m.a_keep end as their_keep,
        exists (select 1 from connections c
@@ -203,7 +204,7 @@ def _match_view(row: dict) -> dict:
     }
     view = {key: row[key] for key in ("match_id", "topic", "score", "created_at",
                                       "my_status", "their_status", "expired",
-                                      "my_keep", "their_keep", "connected")}
+                                      "my_keep", "their_keep", "connected", "room_id")}
     return {**view, "other": other}
 
 
@@ -240,6 +241,17 @@ def respond(user_id: UUID, match_id: int, body: RespondBody) -> dict:
             """,
             {"me": user_id, "status": status, "id": match_id},
         ).fetchone()
+        # The accept that completes the pair picks the Jitsi room. "room_id is
+        # null" keeps it to one room even if both accept at the same moment;
+        # the random part makes it unguessable. Both apps join it from /poll.
+        conn.execute(
+            """
+            update matches
+            set room_id = 'workmatch-' || id || '-' || substr(md5(random()::text || clock_timestamp()::text), 1, 10)
+            where id = %(id)s and a_status = 'accepted' and b_status = 'accepted' and room_id is null
+            """,
+            {"id": match_id},
+        )
         row = conn.execute(MATCH_VIEW_SQL + " and m.id = %(id)s", {"me": user_id, "id": match_id}).fetchone()
     if row is None:
         raise HTTPException(404, "match not found")

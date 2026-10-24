@@ -20,7 +20,8 @@ Flow:
 
 1. Jev finds a pair, which inserts a `matches` row. That row is the "match occurred" flag.
 2. Both apps show the popup. Each person answers on their own (`a_status`, `b_status`).
-3. Both accept: the call starts.
+3. Both accept: the second accept sets `matches.room_id`, and each app's poll sees it and opens
+   `https://meet.jit.si/<room_id>` in the browser (the first person in signs in with Google).
 4. Both say "keep in touch": a `connections` row is created for that topic.
 5. Later, whenever one of them pushes a task on that topic, a row lands in
    `is_working_on_connections` and the other person's icon lights up.

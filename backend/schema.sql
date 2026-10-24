@@ -79,6 +79,7 @@ create table matches (
     a_status   text        not null default 'pending' check (a_status in ('pending','accepted','declined')),
     b_status   text        not null default 'pending' check (b_status in ('pending','accepted','declined')),
     created_at timestamptz not null default now(),               -- popup expires after 2 min
+    room_id    text,                                             -- Jitsi room name, set when both accept; the apps join it
     a_keep     boolean,                                          -- "keep in touch?" after both accept;
     b_keep     boolean,                                          --   NULL until answered, both true -> connection
     check (user_a < user_b)                                      -- store each pair one way

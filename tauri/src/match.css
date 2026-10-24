@@ -152,3 +152,21 @@ button.secondary:hover {
   vertical-align: middle;
   margin-right: 8px;
 }
+
+button {
+  white-space: nowrap;
+}
+
+.call-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Join call: the one sticker-colored button on the glass. */
+button.call {
+  background: #55db9c;
+  border-color: #000;
+  color: #000;
+  margin-right: auto;
+}

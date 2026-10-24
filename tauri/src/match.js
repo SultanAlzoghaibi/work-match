@@ -64,10 +64,22 @@ function personCard(other) {
   );
 }
 
+/// "Join call" once both accepted (matches.room_id). The app already opened
+/// the call in the browser; this reopens it if the tab was closed.
+function callButton(view) {
+  if (!view.room_id) return null;
+  return el(
+    "button",
+    { class: "call", onclick: () => invoke("open_call", { matchId: view.match_id }).catch(console.error) },
+    "📞 Join call",
+  );
+}
+
 function closeButton(view) {
   return el(
     "div",
     { class: "actions" },
+    callButton(view),
     el("button", { class: "primary", onclick: () => invoke("dismiss_match", { matchId: view.match_id }) }, "Close"),
   );
 }
@@ -116,6 +128,7 @@ function renderAccepted(view) {
       el("div", { class: "eyebrow" }, "🎉 It's a match"),
       el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to say if they want to keep in touch…"),
       personCard(other),
+      view.room_id ? el("div", { class: "actions" }, callButton(view)) : null,
     );
   } else {
     const error = el("p", { class: "error" });
@@ -131,6 +144,9 @@ function renderAccepted(view) {
       el("div", { class: "eyebrow" }, "🎉 It's a match"),
       el("p", { class: "intro" }, "You both accepted! Keep in touch with ", el("strong", {}, name), " on ", topic, "?"),
       el("p", { class: "meta" }, "If you both say yes, you'll see when they're working on it."),
+      view.room_id
+        ? el("div", { class: "call-row" }, callButton(view), el("span", { class: "meta" }, "Opened in your browser."))
+        : null,
       error,
       el(
         "div",

@@ -22,7 +22,7 @@ How matching works: [`../../docs/DATABASE.md`](../../docs/DATABASE.md).
 | `GET` | `/users/{id}/task-history?limit=50` | The user's past pushes from `curr_task_history`, newest first (`limit` 1–500). Every push appends a row; quit / pause don't delete them |
 | `DELETE` | `/users/{id}/task` | Removes the user's `curr_task` and active rows (QUIT / PAUSE). The app calls it when a 30 s demo session ends, on Stop and on Quit |
 | `GET` | `/users/{id}/poll` | The user's matches from the last 15 min, newest first: `my_status`, `their_status`, `expired`, and `other` (the other person's profile + live task). The app calls it every 3 s |
-| `POST` | `/users/{id}/matches/{match_id}/respond` | Body `{accept}`. Sets the user's side while it's pending, nobody declined and the 2-min popup hasn't expired; otherwise 409 |
+| `POST` | `/users/{id}/matches/{match_id}/respond` | Body `{accept}`. Sets the user's side while it's pending, nobody declined and the 2-min popup hasn't expired; otherwise 409. The accept that completes the pair sets `matches.room_id` (a Jitsi room); both apps see it in `/poll` and join `https://meet.jit.si/<room_id>` |
 
 ## Match search (`app/matching.py`, `app/jev.py`)
 

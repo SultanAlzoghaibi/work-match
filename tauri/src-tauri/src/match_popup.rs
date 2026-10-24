@@ -8,6 +8,10 @@ use tauri::{Emitter, Manager, Runtime};
 
 const POLL_EVERY: Duration = Duration::from_secs(3);
 
+/// Matches get a Jitsi room (matches.room_id) when both accept; each app joins
+/// it on its own. Swap for JaaS or a self-hosted Jitsi here.
+const JITSI_BASE_URL: &str = "https://meet.jit.si";
+
 /// One match as GET /users/{id}/poll returns it (MatchView in
 /// backend/fastapi-sultan/app/schemas.py). Only `match_id` and the statuses
 /// matter here; everything else passes through to the popup unchanged.
@@ -35,13 +39,62 @@ pub struct MatchState {
     current: Mutex<Option<MatchView>>,
     /// Matches the user closed; polling never reopens them.
     dismissed: Mutex<HashSet<i64>>,
+    /// Matches whose call was already opened automatically (once each).
+    opened_calls: Mutex<HashSet<i64>>,
 }
 
 fn show_state<R: Runtime>(app: &tauri::AppHandle<R>, view: MatchView) {
+    join_call_once(app, &view);
     *app.state::<MatchState>().current.lock().unwrap() = Some(view.clone());
     // The main window listens too, to stop its task search once matched.
     let _ = app.emit_to(crate::MAIN_LABEL, "match-state", view.clone());
     let _ = app.emit_to(crate::MATCH_LABEL, "match-state", view);
+}
+
+/// The match's Jitsi room, if both accepted. Only letters, digits and '-' are
+/// allowed, so the URL can't point anywhere but the Jitsi server.
+fn room_id(view: &MatchView) -> Option<&str> {
+    let room = view.rest.get("room_id")?.as_str()?;
+    let valid = !room.is_empty() && room.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    valid.then_some(room)
+}
+
+fn open_room<R: Runtime>(app: &tauri::AppHandle<R>, room: &str) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = format!("{JITSI_BASE_URL}/{room}");
+    println!("[match] joining room {url}");
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|err| err.to_string())
+}
+
+/// Both accepted: open the call in the browser the first time this app sees
+/// the room (from the poll or its own answer), never again on later polls.
+fn join_call_once<R: Runtime>(app: &tauri::AppHandle<R>, view: &MatchView) {
+    let Some(room) = room_id(view) else {
+        return;
+    };
+    let state = app.state::<MatchState>();
+    if state.dismissed.lock().unwrap().contains(&view.match_id) {
+        return;
+    }
+    if !state.opened_calls.lock().unwrap().insert(view.match_id) {
+        return;
+    }
+    if let Err(err) = open_room(app, room) {
+        eprintln!("[match] couldn't open the call: {err}");
+    }
+}
+
+/// The popup's "Join call" button: open the current match's call again.
+#[tauri::command]
+pub fn open_call<R: Runtime>(app: tauri::AppHandle<R>, match_id: i64) -> Result<(), String> {
+    let current = app.state::<MatchState>().current.lock().unwrap().clone();
+    let view = current
+        .filter(|view| view.match_id == match_id)
+        .ok_or("this match isn't showing anymore")?;
+    let room = room_id(&view).ok_or("no call yet: you both need to accept")?;
+    open_room(&app, room)
 }
 
 /// Apply one poll result: the newest match the user hasn't closed wins.
@@ -292,6 +345,19 @@ mod tests {
 
     /// A real GET /users/{id}/poll item from backend/fastapi-sultan.
     const POLL_ITEM: &str = r#"{"match_id": 3, "topic": "LeetCode", "score": 0.94, "created_at": "2026-10-24T09:50:42.081383Z", "my_status": "pending", "their_status": "pending", "expired": false, "other": {"id": "00000000-0000-0000-0000-000000000000", "name": "New User", "school": null, "bio": null, "age_group": null, "country": null, "discord_handle": null, "task_summary": "Grinding LeetCode dynamic programming problems."}}"#;
+
+    #[test]
+    fn room_id_only_accepts_plain_room_names() {
+        let with_room = |room: serde_json::Value| {
+            let mut view: MatchView = serde_json::from_str(POLL_ITEM).unwrap();
+            view.rest.insert("room_id".into(), room);
+            view
+        };
+        assert_eq!(room_id(&with_room("workmatch-11-bd4f8cca8a".into())), Some("workmatch-11-bd4f8cca8a"));
+        assert_eq!(room_id(&with_room(serde_json::Value::Null)), None);
+        assert_eq!(room_id(&with_room("evil.com/x".into())), None);
+        assert_eq!(room_id(&with_room("".into())), None);
+    }
 
     #[test]
     fn poll_item_round_trips_for_the_popup() {

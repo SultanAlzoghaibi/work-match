@@ -81,7 +81,8 @@ pub fn run() {
                 .add_migrations(DB_FILE, migrations)
                 .build(),
         )
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init());
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
@@ -198,6 +199,7 @@ pub fn run() {
             match_popup::current_connections,
             match_popup::join_connection,
             match_popup::keep_match,
+            match_popup::open_call,
             friend_finding::get_friend_finding,
             friend_finding::set_friend_finding,
             sharing::get_sharing,

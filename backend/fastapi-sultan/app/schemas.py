@@ -129,6 +129,7 @@ class MatchView(BaseModel):
     my_keep: bool | None                         # "keep in touch?" after both accept
     their_keep: bool | None
     connected: bool                              # a connection exists for this pair + topic
+    room_id: str | None                          # Jitsi room, set when both accept; apps join it
     other: OtherPerson
 
 
