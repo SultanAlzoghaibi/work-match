@@ -58,6 +58,38 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
 static COURSE_CODE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([A-Za-z]{2,5}) ?(\d{1,3}[A-Za-z]{0,2})$").unwrap());
 
+/// Pages and apps the model never sees: email, messaging, banking and health.
+/// The prompt also says to ignore them, but the eval (summarizer-eval/) showed
+/// the model shares health pages anyway, so they're dropped here first.
+const PRIVATE_HOSTS: [&str; 24] = [
+    "mail.google.com", "outlook.live.com", "outlook.office.com", "mail.yahoo.com", "proton.me",
+    "web.whatsapp.com", "messenger.com", "web.telegram.org", "discord.com", "slack.com",
+    "chase.com", "bankofamerica.com", "wellsfargo.com", "capitalone.com", "paypal.com", "venmo.com",
+    "rbc.com", "td.com", "mychart", "webmd.com", "healthline.com", "mayoclinic.org",
+    "patient.info", "zocdoc.com",
+];
+const PRIVATE_APPS: [&str; 9] = [
+    "Mail", "Messages", "Slack", "Discord", "WhatsApp", "Telegram", "Signal", "Messenger", "Outlook",
+];
+
+fn is_private_host(host: &str) -> bool {
+    let host = host.to_lowercase();
+    PRIVATE_HOSTS.iter().any(|private| {
+        host == *private || host.ends_with(&format!(".{private}")) || (!private.contains('.') && host.contains(private))
+    })
+}
+
+fn is_private_app(app: &AppSession) -> bool {
+    PRIVATE_APPS.iter().any(|name| app.app_name.eq_ignore_ascii_case(name))
+        // A browser window showing a private page (its title names the site).
+        || app.window_title.as_deref().is_some_and(|title| {
+            let title = title.to_lowercase();
+            ["gmail", "outlook", "mychart", "webmd", "online banking", "whatsapp"]
+                .iter()
+                .any(|marker| title.contains(marker))
+        })
+}
+
 const MAX_PROMPT_CHARS: usize = 6000;
 const MAX_CAPTURE_CHARS: usize = 800;
 const MAX_TOPIC_WORDS: usize = 3;
@@ -272,10 +304,12 @@ where
     F: FnMut(String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
+    let captures: Vec<Capture> = captures.iter().filter(|capture| !is_private_host(&capture.host)).cloned().collect();
+    let apps: Vec<AppSession> = apps.iter().filter(|app| !is_private_app(app)).cloned().collect();
     if captures.is_empty() && apps.is_empty() {
         return ActivitySummary::not_shareable(Source::Idle, now, window_minutes);
     }
-    let prompt = build_prompt(captures, apps, previous_topic);
+    let prompt = build_prompt(&captures, &apps, previous_topic);
     if crate::collecting_data::debug_logs() {
         println!(
             "[summarizer] ---- what the model reads ({} pages, {} app sessions) ----\n{prompt}\n[summarizer] ---- end ----",
@@ -683,6 +717,32 @@ mod tests {
         let chrome = prompt.find("Chrome: Two Sum - LeetCode (2 min)").expect("merged chrome line");
         assert!(code < chrome);
         assert!(!prompt.contains("Pages from"));
+    }
+
+    #[tokio::test]
+    async fn private_pages_and_apps_never_reach_the_model() {
+        let captures = vec![
+            capture(1, "mail.google.com", "/mail/u/0", "Inbox - Gmail", "Interview invite"),
+            capture(2, "secure.chase.com", "/dashboard", "Accounts", "balance"),
+            capture(3, "mychart.example.org", "/results", "Test Results", "Ferritin LOW"),
+            capture(4, "leetcode.com", "/problems/two-sum/", "Two Sum - LeetCode", "Given an array"),
+        ];
+        let apps = [app("Messages", "Mom", 0, 60_000), app("Google Chrome", "Inbox (3) - Gmail", 0, 60_000)];
+        let summary = summarize(&captures, &apps, None, NOW, 5, |prompt| async move {
+            for private in ["mail.google", "chase", "mychart", "Messages", "Gmail", "Ferritin"] {
+                assert!(!prompt.contains(private), "{private} reached the model");
+            }
+            assert!(prompt.contains("leetcode.com"));
+            Ok(reply("LeetCode", "Solving Two Sum on LeetCode"))
+        })
+        .await;
+        assert!(summary.shareable);
+
+        let only_private = summarize(&captures[..3], &apps, None, NOW, 5, |_| async {
+            Err::<String, _>("the model must not be called".to_string())
+        })
+        .await;
+        assert_eq!(only_private, ActivitySummary::not_shareable(Source::Idle, NOW, 5));
     }
 
     #[tokio::test]
