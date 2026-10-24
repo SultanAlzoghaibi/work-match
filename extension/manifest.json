@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "work-match capture",
+  "version": "0.1.0",
+  "description": "Sends the readable text of your active tab to the work-match app running on this computer.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl0CbXwiBVdo06bvvu45YckATVkA1CJQtJI7/e2R+iWpFJPx12sGdF8KiiFNQhigdtl5nQQQE00vmrey3jbrdp6xAkCtFvl9EoANUhE1p1Z4/kwCtz4vBLDx9pZRs9GTCu+C2NrukrjkxJUdfdyWKTmWdg+ok3IJy9kxYSlYZwt6GOV9RpLzeaQ5Ier88LfwNrNnsYFAgadKWWN5ktfnGt5tsnEKwjO6eRWFyIFqM54ZadLTWL5OR1ZHfzrLcj90M5/hgEPM4Gv+i0O3L8KrMRMSds/c3e2CVvIq6kwWd85gQF4MBADOyMDVg3KbOc3dP+kn9R3TkTmWwI5mwLznj2wIDAQAB",
+  "permissions": ["tabs", "scripting", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "incognito": "not_allowed"
+}

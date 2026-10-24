@@ -1,1 +1,3 @@
 .idea/
+# Never commit the extension's private key (see extension/README.md).
+*.pem

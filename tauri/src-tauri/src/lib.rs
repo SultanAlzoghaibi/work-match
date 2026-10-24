@@ -1,5 +1,12 @@
+mod api;
+mod buffer;
+mod capture_server;
 mod db;
+mod llm;
 mod match_popup;
+mod scrub;
+mod sharing;
+mod summarizer;
 mod window;
 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -36,11 +43,13 @@ pub fn run() {
         },
     ];
 
-    let builder = tauri::Builder::default().plugin(
-        tauri_plugin_sql::Builder::default()
-            .add_migrations(DB_FILE, migrations)
-            .build(),
-    );
+    let builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations(DB_FILE, migrations)
+                .build(),
+        )
+        .plugin(tauri_plugin_shell::init());
 
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
@@ -62,9 +71,15 @@ pub fn run() {
             let match_window = app.get_webview_window(MATCH_LABEL).unwrap();
             match_window.hide().ok();
 
+            start_activity_capture(app)?;
+
             let header_item = tauri::menu::MenuItemBuilder::new("work-match")
                 .id("header")
                 .enabled(false)
+                .build(app)?;
+            let sharing_item = tauri::menu::CheckMenuItemBuilder::new("Share my activity")
+                .id("sharing")
+                .checked(app.state::<sharing::Sharing>().is_on())
                 .build(app)?;
             let open_item = tauri::menu::MenuItemBuilder::new("Open")
                 .id("open")
@@ -75,9 +90,12 @@ pub fn run() {
             let menu = tauri::menu::MenuBuilder::new(app)
                 .item(&header_item)
                 .separator()
+                .item(&sharing_item)
+                .separator()
                 .item(&open_item)
                 .item(&quit_item)
                 .build()?;
+            app.manage(sharing::SharingMenuItem(sharing_item));
 
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
                 .expect("tray icon load failed");
@@ -88,6 +106,11 @@ pub fn run() {
                 // Left click opens the main window; right click shows the menu.
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
+                    // Driven by our flag, not the item's own toggle, so the checkmark can't drift.
+                    "sharing" => {
+                        let on = !app.state::<sharing::Sharing>().is_on();
+                        sharing::set(app, on);
+                    }
                     "open" => window::open_main_window(app),
                     "quit" => app.exit(0),
                     _ => {}
@@ -128,10 +151,39 @@ pub fn run() {
             match_popup::trigger_mock_match,
             match_popup::current_match,
             match_popup::respond_match,
+            sharing::get_sharing,
+            sharing::set_sharing,
+            summarizer::get_last_summary,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, _event| {});
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                // TODO: tell the backend to delete curr_task (QUIT / PAUSE in backend/schema.sql).
+                if let Some(llm) = app_handle.try_state::<llm::Llm>() {
+                    llm.shutdown();
+                }
+            }
+        });
+}
+
+/// Chrome tab capture → local SQLite buffer → local Llama summary.
+/// See docs/activity-capture.md.
+fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let data_dir = app.path().app_data_dir()?;
+    std::fs::create_dir_all(&data_dir)?;
+    let buffer = buffer::Buffer::open(&data_dir.join(buffer::FILE_NAME))?;
+    // Captured text never survives a restart.
+    buffer.clear_captures()?;
+    let sharing = sharing::Sharing::new(db::load_sharing_enabled(app.handle()).unwrap_or(false));
+
+    buffer::start_sweeper(buffer.clone());
+    capture_server::start(buffer.clone(), sharing.clone());
+    app.manage(buffer);
+    app.manage(sharing);
+    app.manage(llm::start(app.handle()));
+    summarizer::start(app.handle().clone());
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
