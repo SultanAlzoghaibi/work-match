@@ -5,3 +5,4 @@ src-tauri/gen
 src-tauri/target-instance2
 # Sidecar binaries are built or downloaded locally (see src-tauri/binaries/README.md).
 src-tauri/binaries/llama-server-*
+src-tauri/binaries/wm-ocr-*

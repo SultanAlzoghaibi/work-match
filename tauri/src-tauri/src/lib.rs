@@ -256,6 +256,7 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     summarizer::start(app.handle().clone());
     // Which app / window is in front, while sharing is on (collecting_data/).
     collecting_data::app_tracker::start(app.handle().clone());
+    collecting_data::screen_capture::start(app.handle().clone());
     Ok(())
 }
 

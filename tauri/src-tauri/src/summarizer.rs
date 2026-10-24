@@ -80,14 +80,28 @@ fn is_private_host(host: &str) -> bool {
 }
 
 fn is_private_app(app: &AppSession) -> bool {
-    PRIVATE_APPS.iter().any(|name| app.app_name.eq_ignore_ascii_case(name))
-        // A browser window showing a private page (its title names the site).
-        || app.window_title.as_deref().is_some_and(|title| {
-            let title = title.to_lowercase();
-            ["gmail", "outlook", "mychart", "webmd", "online banking", "whatsapp"]
-                .iter()
-                .any(|marker| title.contains(marker))
-        })
+    is_private_app_name(&app.app_name) || app.window_title.as_deref().is_some_and(title_looks_private)
+}
+
+fn is_private_app_name(name: &str) -> bool {
+    PRIVATE_APPS.iter().any(|private| name.eq_ignore_ascii_case(private))
+}
+
+/// A browser window showing a private page (its title names the site).
+fn title_looks_private(title: &str) -> bool {
+    let title = title.to_lowercase();
+    ["gmail", "outlook", "mychart", "webmd", "online banking", "whatsapp"]
+        .iter()
+        .any(|marker| title.contains(marker))
+}
+
+/// Chrome pages by host; screen text (screen_capture.rs) by app name and window title.
+fn is_private_capture(capture: &Capture) -> bool {
+    if capture.source == "screen" {
+        is_private_app_name(&capture.host) || title_looks_private(&capture.title)
+    } else {
+        is_private_host(&capture.host)
+    }
 }
 
 const MAX_PROMPT_CHARS: usize = 6000;
@@ -304,7 +318,7 @@ where
     F: FnMut(String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    let captures: Vec<Capture> = captures.iter().filter(|capture| !is_private_host(&capture.host)).cloned().collect();
+    let captures: Vec<Capture> = captures.iter().filter(|capture| !is_private_capture(capture)).cloned().collect();
     let apps: Vec<AppSession> = apps.iter().filter(|app| !is_private_app(app)).cloned().collect();
     if captures.is_empty() && apps.is_empty() {
         return ActivitySummary::not_shareable(Source::Idle, now, window_minutes);
@@ -354,28 +368,52 @@ fn build_prompt(captures: &[Capture], apps: &[AppSession], previous_topic: Optio
     if captures.is_empty() {
         return prompt;
     }
-    prompt.push_str("Pages from the last few minutes, newest first:\n");
-    let mut seen = HashSet::new();
+    // Pages first, then screen text; both newest first, one entry per page or
+    // window, sharing one MAX_PROMPT_CHARS budget.
+    let (screens, pages): (Vec<&Capture>, Vec<&Capture>) =
+        captures.iter().rev().partition(|capture| capture.source == "screen");
     let mut used = 0;
-    for capture in captures.iter().rev() {
-        if !seen.insert((capture.host.as_str(), capture.path.as_str())) {
+    let sections = [
+        ("Pages from the last few minutes, newest first:\n", pages),
+        (
+            "Screen text from apps in front in the last few minutes (read from the screen, so it can \
+             include menus, sidebars and stray words; focus on the main content), newest first:\n",
+            screens,
+        ),
+    ];
+    for (heading, entries) in sections {
+        if entries.is_empty() {
             continue;
         }
-        let text: String = capture.text.chars().take(MAX_CAPTURE_CHARS).collect();
-        let entry = format!(
-            "\n[{}] {}{} | {}\n{}\n",
-            clock_time(capture.captured_at),
-            capture.host,
-            capture.path.trim_end_matches('/'),
-            capture.title,
-            text
-        );
-        let entry_chars = entry.chars().count();
-        if used > 0 && used + entry_chars > MAX_PROMPT_CHARS {
-            break;
+        if !prompt.is_empty() && !prompt.ends_with("\n\n") {
+            prompt.push('\n');
         }
-        used += entry_chars;
-        prompt.push_str(&entry);
+        prompt.push_str(heading);
+        let mut seen = HashSet::new();
+        for capture in entries {
+            if !seen.insert((capture.host.as_str(), capture.path.as_str())) {
+                continue;
+            }
+            let text: String = capture.text.chars().take(MAX_CAPTURE_CHARS).collect();
+            let entry = if capture.source == "screen" {
+                format!("\n[{}] {} | {}\n{}\n", clock_time(capture.captured_at), capture.host, capture.title, text)
+            } else {
+                format!(
+                    "\n[{}] {}{} | {}\n{}\n",
+                    clock_time(capture.captured_at),
+                    capture.host,
+                    capture.path.trim_end_matches('/'),
+                    capture.title,
+                    text
+                )
+            };
+            let entry_chars = entry.chars().count();
+            if used > 0 && used + entry_chars > MAX_PROMPT_CHARS {
+                break;
+            }
+            used += entry_chars;
+            prompt.push_str(&entry);
+        }
     }
     prompt
 }
@@ -509,6 +547,7 @@ mod tests {
     fn capture(id: i64, host: &str, path: &str, title: &str, text: &str) -> Capture {
         Capture {
             id,
+            source: "chrome".into(),
             captured_at: NOW - 60_000 + id * 1_000,
             host: host.into(),
             path: path.into(),
@@ -717,6 +756,66 @@ mod tests {
         let chrome = prompt.find("Chrome: Two Sum - LeetCode (2 min)").expect("merged chrome line");
         assert!(code < chrome);
         assert!(!prompt.contains("Pages from"));
+    }
+
+    fn screen(id: i64, app_name: &str, title: &str, text: &str) -> Capture {
+        Capture { source: "screen".into(), ..capture(id, app_name, title, title, text) }
+    }
+
+    #[tokio::test]
+    async fn screen_text_reaches_the_model_in_its_own_section() {
+        let captures = vec![
+            capture(1, "leetcode.com", "/problems/network-delay-time/", "Network Delay Time - LeetCode", "You are given a network"),
+            screen(2, "Code", "dijkstra.py — cs170-hw4", "def dijkstra(graph, src): dist = {}"),
+            screen(3, "Preview", "lecture12-shortest-paths.pdf", "Shortest paths: Bellman-Ford"),
+        ];
+        let summary = summarize(&captures, &[], None, NOW, 5, |prompt| async move {
+            let pages = prompt.find("Pages from the last few minutes").expect("pages section");
+            let screen = prompt.find("Screen text from apps in front").expect("screen section");
+            assert!(pages < screen, "pages come before screen text");
+            assert!(prompt.contains("] Code | dijkstra.py — cs170-hw4\ndef dijkstra(graph, src)"));
+            assert!(prompt.contains("] Preview | lecture12-shortest-paths.pdf"));
+            assert!(prompt[..screen].contains("leetcode.com/problems/network-delay-time"));
+            Ok(reply("CS 170", "Implementing Dijkstra for an algorithms homework"))
+        })
+        .await;
+        assert!(summary.shareable);
+    }
+
+    #[tokio::test]
+    async fn screen_text_alone_is_enough_for_a_summary() {
+        let captures = vec![screen(1, "Code", "dijkstra.py — cs170-hw4", "def dijkstra(graph, src):")];
+        let summary = summarize(&captures, &[], None, NOW, 5, |prompt| async move {
+            assert!(!prompt.contains("Pages from the last few minutes"));
+            assert!(prompt.contains("Screen text from apps in front"));
+            Ok(reply("CS 170", "Implementing Dijkstra for an algorithms homework"))
+        })
+        .await;
+        assert!(summary.shareable);
+    }
+
+    #[tokio::test]
+    async fn private_screen_text_never_reaches_the_model() {
+        let captures = vec![
+            screen(1, "Messages", "Mom", "see you at dinner"),
+            screen(2, "Google Chrome", "Inbox (3) - Gmail", "Interview invite from Scale"),
+            screen(3, "Code", "dijkstra.py", "def dijkstra(graph, src):"),
+        ];
+        let summary = summarize(&captures, &[], None, NOW, 5, |prompt| async move {
+            for private in ["Messages", "dinner", "Gmail", "Interview invite"] {
+                assert!(!prompt.contains(private), "{private} reached the model");
+            }
+            assert!(prompt.contains("dijkstra.py"));
+            Ok(reply("CS 170", "Implementing Dijkstra for an algorithms homework"))
+        })
+        .await;
+        assert!(summary.shareable);
+
+        let only_private = summarize(&captures[..2], &[], None, NOW, 5, |_| async {
+            Err::<String, _>("the model must not be called".to_string())
+        })
+        .await;
+        assert_eq!(only_private, ActivitySummary::not_shareable(Source::Idle, NOW, 5));
     }
 
     #[tokio::test]
