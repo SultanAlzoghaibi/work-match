@@ -7,7 +7,10 @@
 set -e
 cd "$(dirname "$0")"
 tag="${LLAMA_TAG:-b11669}"
-src="${TMPDIR:-/tmp}/llama.cpp-$tag"
+# Real path: macOS's TMPDIR (/var/folders/...) is a symlink to /private/var,
+# and llama.cpp's UI asset step breaks when the two spellings mix.
+tmp="$(cd "${TMPDIR:-/tmp}" && pwd -P)"
+src="$tmp/llama.cpp-$tag"
 [ -d "$src" ] || git clone --depth 1 --branch "$tag" https://github.com/ggml-org/llama.cpp "$src"
 cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF -DGGML_METAL_EMBED_LIBRARY=ON \

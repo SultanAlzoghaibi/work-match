@@ -45,6 +45,18 @@ create table curr_task (
     pushed_at    timestamptz not null default now()
 );
 
+-- 2b. Every push, kept as history (curr_task only holds the latest one). For
+--     debugging and for looking back at past work. Never deleted by quit/pause.
+create table curr_task_history (
+    id           bigint generated always as identity primary key,
+    user_id      uuid        not null references users(id) on delete cascade,
+    task_summary text        not null,
+    topic        text,
+    pushed_at    timestamptz not null default now()
+);
+
+create index idx_curr_task_history_user on curr_task_history (user_id, pushed_at desc);
+
 -- 3. Jev paired two people. A new row = match occurred (created once, starts pending).
 --    Each side answers the popup separately.
 create table matches (
@@ -97,6 +109,7 @@ create table is_working_on_connections (
 -- blocks direct reads from the app's anon key.
 alter table users                     enable row level security;
 alter table curr_task                 enable row level security;
+alter table curr_task_history         enable row level security;
 alter table matches                   enable row level security;
 alter table connections               enable row level security;
 alter table is_working_on_connections enable row level security;
@@ -141,6 +154,7 @@ $$;
 -- insert into curr_task (user_id, task_summary, topic) values (:me, :summary, :topic)
 -- on conflict (user_id) do update set
 --     task_summary = excluded.task_summary, topic = excluded.topic, pushed_at = now();
+-- insert into curr_task_history (user_id, task_summary, topic) values (:me, :summary, :topic);
 -- delete from is_working_on_connections where user_id = :me;
 -- insert into is_working_on_connections (connection_id, user_id)
 --     select id, :me from connections where :me in (user_a, user_b) and topic = :topic;

@@ -225,6 +225,13 @@ where
         return ActivitySummary::not_shareable(Source::Idle, now, window_minutes);
     }
     let prompt = build_prompt(captures, apps, previous_topic);
+    if crate::collecting_data::debug_logs() {
+        println!(
+            "[summarizer] ---- what the model reads ({} pages, {} app sessions) ----\n{prompt}\n[summarizer] ---- end ----",
+            captures.len(),
+            apps.len()
+        );
+    }
     for attempt in 1..=MODEL_ATTEMPTS {
         let output = ask_model(prompt.clone()).await.and_then(|reply| {
             serde_json::from_str::<ModelOutput>(&reply).map_err(|err| format!("bad JSON from the model: {err}"))
@@ -600,4 +607,42 @@ mod tests {
             .collect();
         assert!(build_prompt(&many, &[], None).chars().count() < MAX_PROMPT_CHARS + 100);
     }
+
+    fn app(name: &str, title: &str, started_at: i64, ended_at: i64) -> AppSession {
+        AppSession {
+            id: started_at,
+            app_name: name.into(),
+            bundle_id: None,
+            window_title: Some(title.into()),
+            document: None,
+            started_at,
+            ended_at,
+        }
+    }
+
+    #[test]
+    fn apps_section_merges_repeats_and_puts_most_time_first() {
+        let apps = [
+            app("Chrome", "Two Sum - LeetCode", 0, 60_000),
+            app("Code", "dijkstra.py", 60_000, 300_000),
+            app("Chrome", "Two Sum - LeetCode", 300_000, 360_000),
+        ];
+        let prompt = build_prompt(&[], &apps, None);
+        let code = prompt.find("Code: dijkstra.py (4 min)").expect("code line");
+        let chrome = prompt.find("Chrome: Two Sum - LeetCode (2 min)").expect("merged chrome line");
+        assert!(code < chrome);
+        assert!(!prompt.contains("Pages from"));
+    }
+
+    #[tokio::test]
+    async fn app_sessions_alone_are_summarized_not_idle() {
+        let apps = [app("Code", "dijkstra.py", 0, 300_000)];
+        let summary = summarize(&[], &apps, None, NOW, 5, |_| async {
+            Ok(reply("Coursework", "Implementing Dijkstra's algorithm"))
+        })
+        .await;
+        assert_eq!(summary.source, Source::Llama);
+        assert!(summary.shareable);
+    }
+
 }

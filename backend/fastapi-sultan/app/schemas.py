@@ -133,3 +133,12 @@ class Connection(BaseModel):
     active: bool                                 # friend is working on this topic right now
     seen_at: datetime | None                     # their last push on this topic, if active
     friend: OtherPerson
+
+
+class TaskHistoryItem(BaseModel):
+    """One past push from curr_task_history."""
+
+    id: int
+    task_summary: str
+    topic: str | None
+    pushed_at: datetime

@@ -29,6 +29,9 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
         "[api] summary source={:?} shareable={} topic={:?}",
         summary.source, summary.shareable, summary.topic
     );
+    if crate::collecting_data::debug_logs() {
+        println!("[api] summary task_summary={:?}", summary.task_summary);
+    }
     let Some(payload) = push_payload(summary) else {
         return;
     };
@@ -40,6 +43,9 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
         return;
     };
     let url = format!("{api_url}/users/{user_id}/push");
+    if crate::collecting_data::debug_logs() {
+        println!("[api] POST {url} {body}");
+    }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = async {
@@ -59,6 +65,9 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
                     "[api] pushed topic={} match={} connections={}",
                     saved["topic"], saved["match"]["match_id"], saved["connection_topics"]
                 );
+                if crate::collecting_data::debug_logs() {
+                    println!("[api] backend match result: {}", saved["match"]);
+                }
                 // The main window shows what was shared and the match result.
                 let _ = app.emit_to(crate::MAIN_LABEL, "activity-pushed", saved);
             }

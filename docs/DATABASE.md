@@ -33,6 +33,7 @@ A pair can have many matches, and can be connected on several topics (one row pe
 |---|---|---|---|
 | 1 | `users` | one person | permanent |
 | 2 | `curr_task` | what one person is doing now (`task_summary` + `topic`) | overwritten every push, deleted on quit |
+| 2b | `curr_task_history` | one past push (`task_summary` + `topic` + `pushed_at`) | permanent; for debugging and looking back at past work |
 | 3 | `matches` | Jev paired two people | permanent history |
 | 4 | `connections` | two people follow each other on a topic | permanent |
 | 5 | `is_working_on_connections` | someone is on a connection's topic right now | temporary, usually empty |
@@ -80,8 +81,10 @@ All the push, poll and accept queries are at the bottom of `backend/schema.sql`.
 - The match popup shows the other person's name, school, bio and current `task_summary`
   (read live from `curr_task`, not copied). The on-device AI should write summaries
   knowing a stranger may see them: no file names, client names or personal details.
-- `matches` and `connections` keep only `topic`, not summaries, so nothing detailed is
-  stored permanently.
+- `matches` and `connections` keep only `topic`, not summaries.
+- `curr_task_history` **does** keep every pushed `task_summary` permanently (added for
+  debugging and a "past work" view). Only the backend reads it (RLS on, no policies); delete
+  a user's rows if they ask, and consider a retention limit before launch.
 - Connections see only the topic in the active icon, not the summary.
 - On Supabase, turn on row-level security so users can't read `curr_task` directly. Only
   the backend reads it.

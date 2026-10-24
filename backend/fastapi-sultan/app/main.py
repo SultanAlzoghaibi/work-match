@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg import errors, sql
 
@@ -20,6 +20,7 @@ from .schemas import (
     KeepBody,
     MatchView,
     RespondBody,
+    TaskHistoryItem,
     TaskPush,
     User,
     UserUpdate,
@@ -146,6 +147,11 @@ def push_task(user_id: UUID, task: TaskPush) -> dict:
                 """,
                 (user_id, task.task_summary, task.topic),
             ).fetchone()
+            # History: every push, kept after quit / pause (curr_task_history).
+            conn.execute(
+                "insert into curr_task_history (user_id, task_summary, topic, pushed_at) values (%s, %s, %s, %s)",
+                (user_id, row["task_summary"], row["topic"], row["pushed_at"]),
+            )
             conn.commit()
             # Friends first: light up connections whose topic matches this task,
             # then look for a new person.
@@ -321,3 +327,17 @@ def join_connection(user_id: UUID, connection_id: int) -> dict:
         )
         row = conn.execute(MATCH_VIEW_SQL + " and m.id = %(id)s", {"me": user_id, "id": match["id"]}).fetchone()
     return _match_view(row)
+
+
+
+# TASK HISTORY: my past pushes, newest first (debugging, looking back at work).
+@app.get("/users/{user_id}/task-history", response_model=list[TaskHistoryItem])
+def task_history(user_id: UUID, limit: int = Query(default=50, ge=1, le=500)) -> list[dict]:
+    with connect() as conn:
+        return conn.execute(
+            """
+            select id, task_summary, topic, pushed_at from curr_task_history
+            where user_id = %s order by pushed_at desc limit %s
+            """,
+            (user_id, limit),
+        ).fetchall()

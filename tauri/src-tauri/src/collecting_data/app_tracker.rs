@@ -104,10 +104,28 @@ impl Recorder {
                  VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
                 params![focus.app_name, focus.bundle_id, focus.window_title, focus.document, now],
             )?;
+            if super::debug_logs() {
+                println!("[app-tracker] now in front: {}", describe(&focus));
+            }
             self.open = Some((self.conn.last_insert_rowid(), focus));
         }
         Ok(())
     }
+}
+
+/// "Code: dijkstra.py — cs170-hw4 [cs170-hw4/dijkstra.py]" for the debug log.
+fn describe(focus: &Focus) -> String {
+    let mut text = focus.app_name.clone();
+    if let Some(title) = &focus.window_title {
+        text.push_str(&format!(": {title}"));
+    }
+    if let Some(document) = &focus.document {
+        text.push_str(&format!(" [{document}]"));
+    }
+    if focus.window_title.is_none() && focus.document.is_none() {
+        text.push_str(" (no title: private app or no Accessibility permission)");
+    }
+    text
 }
 
 /// Sessions seen in front at or after `since_ms`, oldest first.
