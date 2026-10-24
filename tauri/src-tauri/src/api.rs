@@ -9,6 +9,10 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct PushPayload<'a> {
     pub task_summary: &'a str,
     pub topic: &'a str,
+    /// The specific subject within the topic. The backend ignores it until its
+    /// push model has a `focus` field (backend/fastapi-sultan/app/schemas.py).
+    #[serde(skip_serializing_if = "str::is_empty")]
+    pub focus: &'a str,
 }
 
 /// None means nothing is pushed: the backend's curr_task row expires after 11
@@ -17,6 +21,7 @@ pub fn push_payload(summary: &ActivitySummary) -> Option<PushPayload<'_>> {
     summary.shareable.then(|| PushPayload {
         task_summary: &summary.task_summary,
         topic: &summary.topic,
+        focus: &summary.focus,
     })
 }
 
@@ -88,6 +93,7 @@ mod tests {
         ActivitySummary {
             shareable,
             topic: if shareable { "LeetCode".into() } else { String::new() },
+            focus: String::new(),
             task_summary: if shareable { "Working through graph problems on LeetCode".into() } else { String::new() },
             source,
             window_minutes: 5,

@@ -1,0 +1,1371 @@
+{
+ "cases": [
+  {
+   "name": "design-at-hackathon",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Ui design system | Refero Styles",
+     "minutes": 3
+    },
+    {
+     "app": "RustRover",
+     "title": "work-match – main.js",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "styles.refero.design",
+     "path": "/ui-design-system",
+     "title": "Ui design system | Refero Styles",
+     "text": "Ui design system. Colors, typography, spacing and components from real products. Primary #4F46E5. Inter 14/20. Buttons Primary Secondary Ghost. Cards. Inputs. Copy tokens. Browse more styles: Linear, Vercel, Stripe."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Hackathon",
+    "Figma design",
+    "UI design",
+    "Design",
+    "App design"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "refero",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "design-no-context",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Ui design system | Refero Styles",
+     "minutes": 3
+    },
+    {
+     "app": "RustRover",
+     "title": "work-match – main.js",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "styles.refero.design",
+     "path": "/ui-design-system",
+     "title": "Ui design system | Refero Styles",
+     "text": "Ui design system. Colors, typography, spacing and components from real products. Primary #4F46E5. Inter 14/20. Buttons Primary Secondary Ghost. Cards. Inputs. Copy tokens."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "UI design",
+    "Design",
+    "Figma design",
+    "App design",
+    "Web design"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "job",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "refero",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "jobs-with-gmail",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "(3) Software Engineer Intern jobs | LinkedIn",
+     "minutes": 4
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Inbox (12) - sam.lee@gmail.com - Gmail",
+     "minutes": 1
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.linkedin.com",
+     "path": "/jobs/search",
+     "title": "(3) Software Engineer Intern jobs | LinkedIn",
+     "text": "Software Engineer Intern - Summer 2027. Easy Apply. 200 applicants. Backend Engineer Intern. Promoted. Save. Apply."
+    },
+    {
+     "host": "mail.google.com",
+     "path": "/mail/u/0",
+     "title": "Inbox (12) - sam.lee@gmail.com - Gmail",
+     "text": "Interview invite from Jane at Stripe: are you free Thursday 3pm? Call me at 415-555-1234"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Job hunting"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "gmail",
+    "hackathon",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "leetcode-plus-youtube",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Course Schedule - LeetCode",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Topological Sort Explained - NeetCode - YouTube",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "leetcode.com",
+     "path": "/problems/course-schedule/",
+     "title": "Course Schedule - LeetCode",
+     "text": "There are numCourses courses you have to take, labeled 0 to numCourses - 1. prerequisites[i] = [ai, bi]. Return true if you can finish all courses."
+    },
+    {
+     "host": "www.youtube.com",
+     "path": "/watch",
+     "title": "Topological Sort Explained - NeetCode - YouTube",
+     "text": "Topological sort with Kahn's algorithm, in-degree, BFS queue"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "LeetCode"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn",
+    "youtube"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "apartments-with-bank",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Brooklyn NY Apartments for Rent | StreetEasy",
+     "minutes": 5
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Google Maps",
+     "minutes": 2
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Chase Online - Accounts",
+     "minutes": 1
+    }
+   ],
+   "pages": [
+    {
+     "host": "streeteasy.com",
+     "path": "/for-rent/brooklyn",
+     "title": "Brooklyn NY Apartments for Rent | StreetEasy",
+     "text": "1 bed in Williamsburg $3,200/mo. No fee. Near L train. 2 bed Bushwick $3,800."
+    },
+    {
+     "host": "www.google.com",
+     "path": "/maps/dir",
+     "title": "Google Maps",
+     "text": "Williamsburg to Midtown 28 min by subway"
+    },
+    {
+     "host": "secure.chase.com",
+     "path": "/web/auth/dashboard",
+     "title": "Chase Online - Accounts",
+     "text": "Checking ...4821 available balance $4,210.55"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Apartment hunting"
+   ],
+   "bad_words": [
+    "bank",
+    "chase",
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "essay-research",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Causes of WWI essay - Google Docs",
+     "minutes": 7
+    },
+    {
+     "app": "Google Chrome",
+     "title": "JSTOR: The Alliance System and the Outbreak of War",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "docs.google.com",
+     "path": "/document/d/1abc/edit",
+     "title": "Causes of WWI essay - Google Docs",
+     "text": "The causes of the First World War were rooted in alliances, militarism and nationalism. In this essay I argue that the alliance system turned a regional crisis into a world war."
+    },
+    {
+     "host": "www.jstor.org",
+     "path": "/stable/123",
+     "title": "The Alliance System and the Outbreak of War",
+     "text": "Abstract: This article examines how the Triple Entente and Triple Alliance"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Writing",
+    "Coursework",
+    "History essay",
+    "Essay writing"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "google docs",
+    "intellij",
+    "iterm",
+    "jstor",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "python-debugging",
+   "apps": [
+    {
+     "app": "Code",
+     "title": "clean_data.py — sales-analysis",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "python - pandas SettingWithCopyWarning - Stack Overflow",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "stackoverflow.com",
+     "path": "/questions/20625582",
+     "title": "python - How to deal with SettingWithCopyWarning in Pandas - Stack Overflow",
+     "text": "A value is trying to be set on a copy of a slice from a DataFrame. Use .loc[row_indexer,col_indexer] = value instead"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Data analysis",
+    "Data cleaning",
+    "Data science",
+    "Python",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "stack overflow",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "figma-plus-dribbble",
+   "apps": [
+    {
+     "app": "Figma",
+     "title": "Onboarding flow v3 – Figma",
+     "minutes": 8
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Mobile onboarding designs on Dribbble",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "dribbble.com",
+     "path": "/tags/onboarding",
+     "title": "Mobile onboarding designs on Dribbble",
+     "text": "Onboarding screens, illustration, fintech app, welcome screen"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Figma design",
+    "UI design",
+    "Design",
+    "App design"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "dribbble",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "only-messaging",
+   "apps": [
+    {
+     "app": "Messages",
+     "title": "Mom",
+     "minutes": 4
+    },
+    {
+     "app": "Slack",
+     "title": "#general - Acme",
+     "minutes": 3
+    }
+   ],
+   "pages": [],
+   "shareable": false,
+   "good_topics": [],
+   "bad_words": [],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "cs61b-course",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Project 2: Gitlet | CS 61B Spring 2027",
+     "minutes": 5
+    },
+    {
+     "app": "IntelliJ IDEA",
+     "title": "gitlet – Repository.java",
+     "minutes": 6
+    }
+   ],
+   "pages": [
+    {
+     "host": "sp27.datastructur.es",
+     "path": "/materials/proj/proj2",
+     "title": "Project 2: Gitlet | CS 61B Spring 2027",
+     "text": "Gitlet is a version-control system that mimics some of the basic features of git. Implement init, add, commit, checkout, log."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "CS 61B"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "thesis-with-twitter",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Thesis - Overleaf",
+     "minutes": 9
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Home / X",
+     "minutes": 1
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.overleaf.com",
+     "path": "/project/abc",
+     "title": "Thesis - Overleaf",
+     "text": "\\section{Related Work} Graph neural networks for molecule property prediction have been studied by"
+    },
+    {
+     "host": "x.com",
+     "path": "/home",
+     "title": "Home / X",
+     "text": "Trending: NBA, election, memes"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Writing",
+    "Research",
+    "Thesis",
+    "Thesis writing"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "overleaf",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "twitter",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "health-portal",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "MyChart - Test Results",
+     "minutes": 4
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Iron deficiency symptoms - WebMD",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "mychart.org",
+     "path": "/results",
+     "title": "MyChart - Test Results",
+     "text": "Ferritin 8 ng/mL LOW. Hemoglobin 10.9 LOW."
+    },
+    {
+     "host": "www.webmd.com",
+     "path": "/a-to-z-guides/iron-deficiency",
+     "title": "Iron deficiency symptoms - WebMD",
+     "text": "Symptoms include fatigue, pale skin"
+    }
+   ],
+   "shareable": false,
+   "good_topics": [],
+   "bad_words": [],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "laptop-shopping",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Amazon.com: MacBook Air M4 15-inch",
+     "minutes": 4
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Best laptops for programming 2027 - The Verge",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.amazon.com",
+     "path": "/dp/B0",
+     "title": "Amazon.com: MacBook Air M4 15-inch",
+     "text": "Apple MacBook Air 15-inch M4, 16GB, $1,299.00. Add to cart."
+    },
+    {
+     "host": "www.theverge.com",
+     "path": "/best-laptops",
+     "title": "Best laptops for programming 2027",
+     "text": "We tested 20 laptops for coding: battery, keyboard, RAM"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Laptop shopping",
+    "Shopping"
+   ],
+   "bad_words": [
+    "amazon",
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": true,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "ai-chat-react",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Claude",
+     "minutes": 4
+    },
+    {
+     "app": "Code",
+     "title": "TaskList.jsx — todo-app",
+     "minutes": 5
+    }
+   ],
+   "pages": [
+    {
+     "host": "claude.ai",
+     "path": "/chat/abc",
+     "title": "Claude",
+     "text": "Why does my useEffect run twice in React 18 strict mode? It's because StrictMode mounts, unmounts and remounts components in development"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Web development",
+    "React",
+    "Frontend development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "job",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "music-plus-notes",
+   "apps": [
+    {
+     "app": "Spotify",
+     "title": "lofi beats",
+     "minutes": 25
+    },
+    {
+     "app": "Notion",
+     "title": "Bio 101 – Cell respiration notes",
+     "minutes": 9
+    }
+   ],
+   "pages": [],
+   "shareable": true,
+   "good_topics": [
+    "Studying",
+    "Coursework",
+    "Biology",
+    "Bio 101"
+   ],
+   "bad_words": [
+    "61b",
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "music",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "spotify",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "hackathon-backend",
+   "apps": [
+    {
+     "app": "RustRover",
+     "title": "work-match – summarizer.rs",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "FastAPI - Path Parameters",
+     "minutes": 2
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Supabase - Table editor",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "fastapi.tiangolo.com",
+     "path": "/tutorial/path-params/",
+     "title": "Path Parameters - FastAPI",
+     "text": "You can declare path parameters with the same syntax used by Python format strings"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Hackathon",
+    "Backend development",
+    "Web development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "supabase",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "summarizer-eval/cases.py"
+  },
+  {
+   "name": "yarn-tauri-app",
+   "apps": [
+    {
+     "app": "Code",
+     "title": "main.js — work-match",
+     "minutes": 5
+    },
+    {
+     "app": "Terminal",
+     "title": "yarn dev1 — work-match — zsh",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "v2.tauri.app",
+     "path": "/develop/sidecar/",
+     "title": "Embedding External Binaries | Tauri",
+     "text": "You may need to embed external binaries to add additional functionality to your application. Configure externalBin in tauri.conf.json."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "App development",
+    "Desktop app",
+    "Desktop app development",
+    "Hackathon",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "npm-react-portfolio",
+   "apps": [
+    {
+     "app": "Code",
+     "title": "App.jsx — portfolio",
+     "minutes": 6
+    },
+    {
+     "app": "Terminal",
+     "title": "npm run dev — portfolio — zsh",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "react.dev",
+     "path": "/reference/react/useState",
+     "title": "useState – React",
+     "text": "useState is a React Hook that lets you add a state variable to your component. const [state, setState] = useState(initialState)"
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Web development",
+    "React",
+    "Frontend development",
+    "Portfolio site",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "git-merge-conflict",
+   "apps": [
+    {
+     "app": "Terminal",
+     "title": "git rebase origin/main — work-match — zsh",
+     "minutes": 3
+    },
+    {
+     "app": "Code",
+     "title": "summarizer.rs — work-match",
+     "minutes": 5
+    }
+   ],
+   "pages": [
+    {
+     "host": "docs.github.com",
+     "path": "/en/get-started/using-git/resolving-merge-conflicts-after-a-git-rebase",
+     "title": "Resolving merge conflicts after a Git rebase - GitHub Docs",
+     "text": "When you perform a git rebase operation, you're typically moving commits around. Because of this, you might get into a situation where a merge conflict is introduced."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Software development",
+    "Hackathon",
+    "Version control",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "pip-pandas-notebook",
+   "apps": [
+    {
+     "app": "Terminal",
+     "title": "pip install pandas matplotlib — zsh",
+     "minutes": 1
+    },
+    {
+     "app": "Code",
+     "title": "sales_analysis.ipynb — reports",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "pandas.pydata.org",
+     "path": "/docs/user_guide/groupby.html",
+     "title": "Group by: split-apply-combine — pandas documentation",
+     "text": "By group by we are referring to a process involving splitting the data into groups, applying a function to each group independently, and combining the results."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Data analysis",
+    "Data science",
+    "Python",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "docker-fastapi-backend",
+   "apps": [
+    {
+     "app": "Terminal",
+     "title": "docker compose up — api — zsh",
+     "minutes": 2
+    },
+    {
+     "app": "Code",
+     "title": "main.py — todo-api",
+     "minutes": 6
+    }
+   ],
+   "pages": [
+    {
+     "host": "fastapi.tiangolo.com",
+     "path": "/tutorial/sql-databases/",
+     "title": "SQL (Relational) Databases - FastAPI",
+     "text": "FastAPI doesn't require you to use a SQL database. Here we'll see an example using SQLModel. Create the engine, the tables, a session dependency."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Backend development",
+    "Web development",
+    "API development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "xcode-swiftui-app",
+   "apps": [
+    {
+     "app": "Xcode",
+     "title": "WeatherApp — ContentView.swift",
+     "minutes": 8
+    }
+   ],
+   "pages": [
+    {
+     "host": "developer.apple.com",
+     "path": "/documentation/swiftui/list",
+     "title": "List | Apple Developer Documentation",
+     "text": "A container that presents rows of data arranged in a single column, optionally providing the ability to select one or more members."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "iOS development",
+    "App development",
+    "iOS app",
+    "SwiftUI",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "jupyter-cs189-homework",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "hw3.ipynb - JupyterLab",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "datahub.berkeley.edu",
+     "path": "/user/lab/tree/hw3.ipynb",
+     "title": "hw3.ipynb - JupyterLab",
+     "text": "CS 189 Homework 3: Logistic regression. Q2: derive the gradient of the cross-entropy loss and implement batch gradient descent."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "CS 189",
+    "Coursework",
+    "Machine learning"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "slack-then-coding",
+   "apps": [
+    {
+     "app": "Slack",
+     "title": "#dev - Acme",
+     "minutes": 2
+    },
+    {
+     "app": "Code",
+     "title": "parser.rs — compiler",
+     "minutes": 6
+    },
+    {
+     "app": "Terminal",
+     "title": "cargo test — compiler — zsh",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "doc.rust-lang.org",
+     "path": "/book/ch09-02-recoverable-errors-with-result.html",
+     "title": "Recoverable Errors with Result - The Rust Programming Language",
+     "text": "Most errors aren't serious enough to require the program to stop entirely. The Result enum is defined as having two variants, Ok and Err."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Rust",
+    "Compiler development",
+    "Programming languages",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "cargo",
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "slack",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "claude-code-hackathon",
+   "apps": [
+    {
+     "app": "Code",
+     "title": "screen_capture.rs — work-match",
+     "minutes": 6
+    },
+    {
+     "app": "Terminal",
+     "title": "claude — work-match — zsh",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "doc.rust-lang.org",
+     "path": "/std/process/struct.Command.html",
+     "title": "Command in std::process - Rust",
+     "text": "A process builder, providing fine-grained control over how a new process should be spawned."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Hackathon",
+    "App development",
+    "Rust",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "tool noise"
+  },
+  {
+   "name": "terminal-only-build",
+   "apps": [
+    {
+     "app": "Terminal",
+     "title": "yarn build — work-match — zsh",
+     "minutes": 4
+    }
+   ],
+   "pages": [],
+   "shareable": true,
+   "good_topics": [
+    "Hackathon",
+    "App development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": true,
+   "from": "tool noise"
+  }
+ ]
+}

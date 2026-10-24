@@ -1,0 +1,769 @@
+{
+ "about": "Activities outside the label list (hobbies, crafts, media, law...), to check they get a real topic instead of being forced into a wrong label.",
+ "cases": [
+  {
+   "name": "woodworking",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "How to refinish an oak table - YouTube",
+     "minutes": 6
+    },
+    {
+     "app": "Notes",
+     "title": "Table project: sanding grits, stain",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.youtube.com",
+     "path": "/watch",
+     "title": "How to refinish an oak table - YouTube",
+     "text": "Sand with 120 then 220 grit, raise the grain, apply oil-based stain, three coats of polyurethane."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Woodworking",
+    "Refinishing",
+    "Furniture refinishing",
+    "Furniture restoration",
+    "DIY"
+   ],
+   "bad_words": [
+    "youtube",
+    "notes",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #1 (5): used to design the own-words rule"
+  },
+  {
+   "name": "legal-brief",
+   "apps": [
+    {
+     "app": "Microsoft Word",
+     "title": "Moot court brief - Fourth Amendment.docx",
+     "minutes": 8
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Carpenter v. United States - Oyez",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.oyez.org",
+     "path": "/cases/2017/16-402",
+     "title": "Carpenter v. United States | Oyez",
+     "text": "Whether the warrantless seizure of cell phone location records violates the Fourth Amendment."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Research",
+    "Writing",
+    "Legal research",
+    "Legal writing",
+    "Law",
+    "Moot court"
+   ],
+   "bad_words": [
+    "word",
+    "oyez",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #1 (5): used to design the own-words rule"
+  },
+  {
+   "name": "video-editing",
+   "apps": [
+    {
+     "app": "Adobe Premiere Pro",
+     "title": "Travel vlog - Sequence 01",
+     "minutes": 9
+    }
+   ],
+   "pages": [
+    {
+     "host": "helpx.adobe.com",
+     "path": "/premiere-pro/using/color-workflows.html",
+     "title": "Color workflows in Premiere Pro",
+     "text": "Use Lumetri Color to correct exposure and match shots across a sequence."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Video editing",
+    "Color correction",
+    "Color grading"
+   ],
+   "bad_words": [
+    "premiere",
+    "adobe",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #1 (5): used to design the own-words rule"
+  },
+  {
+   "name": "knitting",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Easy raglan sweater pattern - Ravelry",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.ravelry.com",
+     "path": "/patterns/library/raglan",
+     "title": "Easy raglan sweater pattern",
+     "text": "Cast on 96 stitches. Knit 2x2 rib for 2 inches. Raglan increases every other round."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Knitting",
+    "Crafts",
+    "Crafting"
+   ],
+   "bad_words": [
+    "ravelry",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #1 (5): used to design the own-words rule"
+  },
+  {
+   "name": "gardening",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Fall vegetable planting guide",
+     "minutes": 5
+    },
+    {
+     "app": "Numbers",
+     "title": "Garden bed plan",
+     "minutes": 4
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.almanac.com",
+     "path": "/fall-vegetables",
+     "title": "Fall Vegetable Planting Guide",
+     "text": "Plant garlic, kale and spinach 6 weeks before the first frost. Space rows 18 inches apart."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Gardening",
+    "Garden planning",
+    "Vegetable gardening"
+   ],
+   "bad_words": [
+    "numbers",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #1 (5): used to design the own-words rule"
+  },
+  {
+   "name": "photography",
+   "apps": [
+    {
+     "app": "Adobe Lightroom Classic",
+     "title": "Portfolio - Develop",
+     "minutes": 7
+    },
+    {
+     "app": "Google Chrome",
+     "title": "How to shoot golden hour portraits",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.adorama.com",
+     "path": "/alc/golden-hour-portraits",
+     "title": "How to shoot golden hour portraits",
+     "text": "Shoot with the sun behind your subject, use a reflector, expose for the face, f/2.8 for soft backgrounds."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Photography",
+    "Photo editing",
+    "Portrait photography"
+   ],
+   "bad_words": [
+    "lightroom",
+    "adobe",
+    "adorama",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #2 (5): written after #1, used to tune it"
+  },
+  {
+   "name": "baking",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Sourdough starter feeding schedule - King Arthur",
+     "minutes": 6
+    },
+    {
+     "app": "Notes",
+     "title": "Bake plan Saturday",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.kingarthurbaking.com",
+     "path": "/blog/sourdough-starter",
+     "title": "Sourdough starter feeding schedule",
+     "text": "Feed your starter 1:1:1 every 12 hours. Discard before feeding. It's ready when it doubles."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Baking",
+    "Cooking",
+    "Sourdough baking",
+    "Bread baking"
+   ],
+   "bad_words": [
+    "king arthur",
+    "notes",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #2 (5): written after #1, used to tune it"
+  },
+  {
+   "name": "podcast-editing",
+   "apps": [
+    {
+     "app": "Audacity",
+     "title": "Episode 12 - raw.aup3",
+     "minutes": 8
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Noise reduction for podcasts",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.descript.com",
+     "path": "/blog/noise-reduction",
+     "title": "Noise reduction for podcasts",
+     "text": "Record room tone, apply noise reduction at 12 dB, then normalize to -16 LUFS for podcasts."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Podcasting",
+    "Podcast editing",
+    "Audio editing",
+    "Music"
+   ],
+   "bad_words": [
+    "audacity",
+    "descript",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #2 (5): written after #1, used to tune it"
+  },
+  {
+   "name": "3d-printing",
+   "apps": [
+    {
+     "app": "UltiMaker Cura",
+     "title": "phone_stand.3mf",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Fixing stringing on PLA prints",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "all3dp.com",
+     "path": "/stringing-3d-printing",
+     "title": "Fixing stringing on PLA prints",
+     "text": "Increase retraction distance to 6 mm, lower nozzle temperature to 200 C, enable combing."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "3D printing",
+    "Making",
+    "Prototyping"
+   ],
+   "bad_words": [
+    "cura",
+    "ultimaker",
+    "all3dp",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #2 (5): written after #1, used to tune it"
+  },
+  {
+   "name": "fitness-plan",
+   "apps": [
+    {
+     "app": "Google Sheets",
+     "title": "Workout log",
+     "minutes": 5
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Push pull legs routine for beginners",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.muscleandstrength.com",
+     "path": "/workouts/ppl",
+     "title": "Push pull legs routine for beginners",
+     "text": "Day 1 push: bench press 4x8, overhead press 3x10. Day 2 pull: rows, pull-ups. Day 3 legs: squats."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Fitness",
+    "Workout planning",
+    "Strength training",
+    "Exercise"
+   ],
+   "bad_words": [
+    "sheets",
+    "google",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #2 (5): written after #1, used to tune it"
+  },
+  {
+   "name": "chess-study",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Study: Sicilian Najdorf • lichess.org",
+     "minutes": 8
+    }
+   ],
+   "pages": [
+    {
+     "host": "lichess.org",
+     "path": "/study/najdorf",
+     "title": "Study: Sicilian Najdorf",
+     "text": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6. The English Attack with Be3 and f3."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Chess",
+    "Chess study",
+    "Chess openings"
+   ],
+   "bad_words": [
+    "lichess",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "sewing",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Wrap dress sewing pattern - Mood Fabrics",
+     "minutes": 6
+    },
+    {
+     "app": "Preview",
+     "title": "pattern_pieces.pdf",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.moodfabrics.com",
+     "path": "/blog/wrap-dress",
+     "title": "Wrap dress sewing pattern",
+     "text": "Cut two front bodice pieces on the bias, sew darts, attach the skirt with a 5/8 inch seam allowance."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Sewing",
+    "Crafts",
+    "Crafting",
+    "Dressmaking"
+   ],
+   "bad_words": [
+    "mood",
+    "preview",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "personal-budget",
+   "apps": [
+    {
+     "app": "Numbers",
+     "title": "Monthly budget 2027",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "50/30/20 budget rule explained - NerdWallet",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.nerdwallet.com",
+     "path": "/article/finance/nerdwallet-budget-calculator",
+     "title": "50/30/20 budget rule explained",
+     "text": "Spend 50% on needs, 30% on wants and put 20% toward savings and debt."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Personal finance",
+    "Budgeting",
+    "Finance",
+    "Money management"
+   ],
+   "bad_words": [
+    "numbers",
+    "nerdwallet",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "illustration",
+   "apps": [
+    {
+     "app": "Procreate",
+     "title": "Character sketch 3",
+     "minutes": 9
+    }
+   ],
+   "pages": [],
+   "shareable": true,
+   "good_topics": [
+    "Illustration",
+    "Art",
+    "Drawing",
+    "Digital art",
+    "Design"
+   ],
+   "bad_words": [
+    "procreate",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "travel-planning",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Flights to Tokyo - Google Flights",
+     "minutes": 5
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Kyoto 3-day itinerary",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.google.com",
+     "path": "/travel/flights",
+     "title": "Flights to Tokyo - Google Flights",
+     "text": "Round trip, 1 adult, economy. Nonstop 11 hr."
+    },
+    {
+     "host": "www.japan-guide.com",
+     "path": "/e/e3963.html",
+     "title": "Kyoto 3-day itinerary",
+     "text": "Day 1: Fushimi Inari and Gion. Day 2: Arashiyama bamboo grove. Day 3: Kinkakuji."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Travel planning",
+    "Travel",
+    "Trip planning"
+   ],
+   "bad_words": [
+    "google",
+    "flights",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "car-maintenance",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "How to change brake pads - YouTube",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.youtube.com",
+     "path": "/watch",
+     "title": "How to change brake pads - YouTube",
+     "text": "Loosen the lug nuts, remove the caliper bolts, slide out the old pads, compress the piston, install new pads."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Car maintenance",
+    "Car repair",
+    "Auto repair",
+    "DIY"
+   ],
+   "bad_words": [
+    "youtube",
+    "other"
+   ],
+   "unsure": false,
+   "from": "off-list #3 (6): written after #2, used to tune the synonyms"
+  },
+  {
+   "name": "guitar-practice",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Fingerpicking patterns for beginners - JustinGuitar",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.justinguitar.com",
+     "path": "/lessons/fingerpicking",
+     "title": "Fingerpicking patterns for beginners",
+     "text": "Travis picking: thumb alternates bass strings while index and middle fingers pluck the melody."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Music",
+    "Guitar",
+    "Guitar practice"
+   ],
+   "bad_words": [
+    "justinguitar",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  },
+  {
+   "name": "go-backend",
+   "apps": [
+    {
+     "app": "Code",
+     "title": "handlers.go — inventory-service",
+     "minutes": 7
+    },
+    {
+     "app": "Terminal",
+     "title": "go test ./... — zsh",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "go.dev",
+     "path": "/doc/tutorial/web-service-gin",
+     "title": "Tutorial: Developing a RESTful API with Go and Gin",
+     "text": "Write handlers for GET /albums and POST /albums using gin.Context."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Web development",
+    "Coding",
+    "Backend development"
+   ],
+   "bad_words": [
+    "vs code",
+    "terminal",
+    "go.dev",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  },
+  {
+   "name": "bio-exam",
+   "apps": [
+    {
+     "app": "Quizlet",
+     "title": "Bio 1A Unit 3 flashcards",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Krebs cycle - Khan Academy",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.khanacademy.org",
+     "path": "/science/biology/cellular-respiration",
+     "title": "The citric acid cycle",
+     "text": "Acetyl CoA joins oxaloacetate to form citrate; each turn makes 3 NADH, 1 FADH2 and 1 ATP."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Bio 1A",
+    "Studying",
+    "Biology"
+   ],
+   "bad_words": [
+    "quizlet",
+    "khan",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  },
+  {
+   "name": "ux-research",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Interview notes - Notion",
+     "minutes": 6
+    },
+    {
+     "app": "Figma",
+     "title": "Usability test synthesis board",
+     "minutes": 4
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.notion.so",
+     "path": "/ux-interviews",
+     "title": "Interview notes",
+     "text": "Participant 3 couldn't find the checkout button. Two of five users expected search at the top."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Design",
+    "Figma design",
+    "UX research",
+    "Research"
+   ],
+   "bad_words": [
+    "notion",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  },
+  {
+   "name": "cover-letter",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Cover letter - Google Docs",
+     "minutes": 7
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Product Manager Intern - Notion careers",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "docs.google.com",
+     "path": "/document/d/7/edit",
+     "title": "Cover letter - Google Docs",
+     "text": "Dear hiring team, I'm excited to apply for the Product Manager Intern role. At my last internship I led user interviews."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Job hunting",
+    "Writing"
+   ],
+   "bad_words": [
+    "google docs",
+    "notion",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  },
+  {
+   "name": "pottery",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "How to center clay on the wheel - YouTube",
+     "minutes": 6
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.youtube.com",
+     "path": "/watch",
+     "title": "How to center clay on the wheel",
+     "text": "Cone the clay up and down three times, brace your elbows on your thighs, keep the wheel fast."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Pottery",
+    "Ceramics",
+    "Crafts"
+   ],
+   "bad_words": [
+    "youtube",
+    "other"
+   ],
+   "unsure": false,
+   "from": "final (6): written last, run once"
+  }
+ ]
+}
