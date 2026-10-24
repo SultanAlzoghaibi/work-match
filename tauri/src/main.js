@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { API_URL, MOCK_USER_ID, pushTask, updateUser } from "./api.js";
+import { API_URL, MOCK_USER_ID, clearTask, pushTask, updateUser } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { AGE_GROUPS, loadProfile, logout, mockLogin, saveProfile } from "./profile.js";
 
@@ -19,9 +19,19 @@ const root = document.getElementById("root");
 document.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "q") {
     event.preventDefault();
-    invoke("quit_app");
+    quitApp();
   }
 });
+
+/// Quit, removing a shared demo task first so nobody gets matched with an app
+/// that's gone.
+async function quitApp() {
+  if (session) {
+    session = null;
+    await clearTask(MOCK_USER_ID).catch(() => {});
+  }
+  invoke("quit_app");
+}
 
 /// Result of the last Save, shown once on the profile view.
 let syncStatus = null;
@@ -37,55 +47,147 @@ function matchLine(match) {
   return best ? `No match: best was ${best.name} at ${best.score.toFixed(2)} (needs 0.80).` : "No match.";
 }
 
+/// A demo task session: clicking a task button shares it for SESSION_MS,
+/// re-pushing every PUSH_EVERY_MS so the match search keeps running as other
+/// people come online. When it ends, the task is removed from the backend.
+const SESSION_MS = 30_000;
+const PUSH_EVERY_MS = 5_000;
+
+let session = null; // { kind, summary, topic, filters, endsAt, nextPushAt, pushing }
+let lastPush = null; // { summary, topic, match } from the latest push, or { error }
+let sessionTimer = null;
+const taskUi = { status: null, matchStatus: null, countdown: null, stopButton: null };
+
+function startSession(kind, filters) {
+  const task = MOCK_TASKS[kind];
+  const now = Date.now();
+  session = {
+    kind,
+    summary: randomSummary(kind),
+    topic: task.topic,
+    filters,
+    endsAt: now + SESSION_MS,
+    nextPushAt: now,
+    pushing: false,
+  };
+  lastPush = null;
+  clearInterval(sessionTimer);
+  sessionTimer = setInterval(tickSession, 250);
+  tickSession();
+}
+
+async function endSession(message) {
+  clearInterval(sessionTimer);
+  session = null;
+  try {
+    await clearTask(MOCK_USER_ID);
+    lastPush = { ended: message };
+  } catch (err) {
+    lastPush = { error: `Couldn't remove the task: ${err.message}` };
+  }
+  updateTaskUi();
+}
+
+async function tickSession() {
+  if (!session) return;
+  const now = Date.now();
+  if (now >= session.endsAt) {
+    await endSession("Session over: your task was removed, so you can't be matched now.");
+    return;
+  }
+  if (now >= session.nextPushAt && !session.pushing) {
+    const current = session;
+    current.pushing = true;
+    current.nextPushAt = now + PUSH_EVERY_MS;
+    try {
+      const saved = await pushTask(MOCK_USER_ID, current.summary, current.topic, current.filters);
+      if (session === current) lastPush = { summary: saved.task_summary, topic: saved.topic, match: saved.match };
+    } catch (err) {
+      if (session === current) lastPush = { error: `Couldn't push: ${err.message}` };
+    } finally {
+      current.pushing = false;
+    }
+  }
+  updateTaskUi();
+}
+
+/// Refresh the task section in place (the profile view may have re-rendered).
+function updateTaskUi() {
+  const { status, matchStatus, countdown, stopButton } = taskUi;
+  if (!status) return;
+  if (session) {
+    const seconds = Math.max(0, Math.ceil((session.endsAt - Date.now()) / 1000));
+    countdown.textContent = `Sharing for ${seconds}s more · re-pushing every ${PUSH_EVERY_MS / 1000}s`;
+    stopButton.hidden = false;
+  } else {
+    countdown.textContent = "";
+    stopButton.hidden = true;
+  }
+  if (lastPush?.error) {
+    status.className = "task-status error";
+    status.textContent = lastPush.error;
+    matchStatus.textContent = "";
+  } else if (lastPush?.ended) {
+    status.className = "task-status muted";
+    status.textContent = lastPush.ended;
+    matchStatus.textContent = "";
+  } else if (lastPush) {
+    status.className = "task-status";
+    status.replaceChildren(el("strong", {}, `${lastPush.topic}: `), lastPush.summary);
+    matchStatus.textContent = matchLine(lastPush.match);
+  } else if (session) {
+    status.className = "task-status muted";
+    status.textContent = "Pushing…";
+    matchStatus.textContent = "Looking for a match…";
+  } else {
+    status.className = "task-status muted";
+    status.textContent = "Not sharing a task yet.";
+    matchStatus.textContent = "";
+  }
+}
+
 function renderTaskDemo() {
-  const status = el("p", { class: "task-status muted" }, "Not sharing a task yet.");
-  const matchStatus = el("p", { class: "task-status muted" });
   const sameCountry = el("input", { type: "checkbox" });
   const sameAgeGroup = el("input", { type: "checkbox" });
-  const buttons = Object.entries(MOCK_TASKS).map(([kind, task]) => {
-    const button = el(
+  const buttons = Object.entries(MOCK_TASKS).map(([kind, task]) =>
+    el(
       "button",
       {
         class: "secondary",
-        onclick: async () => {
-          const summary = randomSummary(kind);
-          button.disabled = true;
-          try {
-            matchStatus.textContent = "Looking for a match…";
-            const saved = await pushTask(MOCK_USER_ID, summary, task.topic, {
-              same_country: sameCountry.checked,
-              same_age_group: sameAgeGroup.checked,
-            });
-            status.className = "task-status";
-            status.replaceChildren(el("strong", {}, `${saved.topic}: `), saved.task_summary);
-            matchStatus.textContent = matchLine(saved.match);
-          } catch (err) {
-            status.className = "task-status error";
-            status.textContent = `Couldn't push: ${err.message}`;
-            matchStatus.textContent = "";
-          } finally {
-            button.disabled = false;
-          }
-        },
+        onclick: () =>
+          startSession(kind, {
+            same_country: sameCountry.checked,
+            same_age_group: sameAgeGroup.checked,
+          }),
       },
       task.label,
-    );
-    return button;
-  });
-  return el(
+    ),
+  );
+  taskUi.stopButton = el(
+    "button",
+    { class: "link", onclick: () => endSession("Stopped: your task was removed.") },
+    "Stop",
+  );
+  taskUi.countdown = el("p", { class: "task-status muted" });
+  taskUi.status = el("p", { class: "task-status muted" });
+  taskUi.matchStatus = el("p", { class: "task-status muted" });
+  const section = el(
     "div",
     { class: "task-demo" },
-    el("span", { class: "label" }, "Push a random task (demo)"),
-    el("div", { class: "task-buttons" }, ...buttons),
+    el("span", { class: "label" }, `Share a random task for ${SESSION_MS / 1000}s (demo)`),
+    el("div", { class: "task-buttons" }, ...buttons, taskUi.stopButton),
     el(
       "div",
       { class: "task-filters" },
       el("label", { class: "toggle" }, sameCountry, el("span", {}, "Only same country")),
       el("label", { class: "toggle" }, sameAgeGroup, el("span", {}, "Only same age group")),
     ),
-    status,
-    matchStatus,
+    taskUi.countdown,
+    taskUi.status,
+    taskUi.matchStatus,
   );
+  updateTaskUi();
+  return section;
 }
 
 /// Tiny DOM helper. Text always goes through textContent, never innerHTML.
@@ -195,7 +297,7 @@ function renderProfile(profile) {
           "div",
           {},
           el("button", { class: "link", onclick: () => logout().then(render, renderError) }, "Log out"),
-          el("button", { class: "link", title: "Quit work-match (⌘Q)", onclick: () => invoke("quit_app") }, "Quit"),
+          el("button", { class: "link", title: "Quit work-match (⌘Q)", onclick: quitApp }, "Quit"),
         ),
         el("button", { class: "primary", onclick: () => renderEdit(profile) }, "Edit"),
       ),

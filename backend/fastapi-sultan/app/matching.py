@@ -14,9 +14,16 @@ def _threshold() -> float:
     return float(os.environ.get("MATCH_THRESHOLD", "0.8"))
 
 
-def _decline_cooldown_minutes() -> int:
-    # Default 1 day, per docs/DATABASE.md. Set to 0 in .env while testing.
-    return int(os.environ.get("DECLINE_COOLDOWN_MINUTES", "1440"))
+def _match_cooldown_minutes() -> int:
+    """How long a pair isn't matched again after any match between them.
+
+    Covers declined pairs (1 day per docs/DATABASE.md) and also pairs that just
+    matched, since the app re-pushes every few seconds during a session. Use a
+    short value like 1 in .env while testing. DECLINE_COOLDOWN_MINUTES is the
+    old name.
+    """
+    value = os.environ.get("MATCH_COOLDOWN_MINUTES") or os.environ.get("DECLINE_COOLDOWN_MINUTES")
+    return int(value or "1440")
 
 
 CANDIDATES_SQL = """
@@ -33,10 +40,9 @@ where t.user_id <> %(me)s
       select 1 from connections c
       where c.user_a = least(%(me)s, t.user_id) and c.user_b = greatest(%(me)s, t.user_id)
         and c.topic = %(topic)s)
-  and not exists (                                                    -- declined recently
+  and not exists (                                                    -- matched recently
       select 1 from matches m
       where m.user_a = least(%(me)s, t.user_id) and m.user_b = greatest(%(me)s, t.user_id)
-        and 'declined' in (m.a_status, m.b_status)
         and m.created_at > now() - make_interval(mins => %(cooldown)s))
 order by t.pushed_at desc
 limit %(limit)s
@@ -64,12 +70,15 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
             "same_age_group": filters.same_age_group,
             "my_age_group": profile["age_group"],
             "topic": topic,
-            "cooldown": _decline_cooldown_minutes(),
+            "cooldown": _match_cooldown_minutes(),
             "limit": jev.MAX_CANDIDATES,
         },
     ).fetchall()
     if not candidates:
-        result["skipped_reason"] = "no one else matching your filters is working right now"
+        result["skipped_reason"] = (
+            "no one available: nobody else is sharing a task that fits your filters, "
+            "or you were matched with them recently"
+        )
         return result
 
     try:

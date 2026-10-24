@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg import errors, sql
 
@@ -105,6 +105,16 @@ def push_task(user_id: UUID, task: TaskPush) -> dict:
         raise HTTPException(404, "user not found") from None
     print(f"[push] {user_id} topic={topic!r} -> {match}")
     return {**row, "match": match}
+
+
+# QUIT / PAUSE (schema.sql): stop being matchable. The app calls this when a
+# task session ends, on pause and on quit.
+@app.delete("/users/{user_id}/task", status_code=204)
+def clear_task(user_id: UUID) -> Response:
+    with connect() as conn:
+        conn.execute("delete from curr_task where user_id = %s", (user_id,))
+        conn.execute("delete from is_working_on_connections where user_id = %s", (user_id,))
+    return Response(status_code=204)
 
 
 MATCH_VIEW_SQL = """

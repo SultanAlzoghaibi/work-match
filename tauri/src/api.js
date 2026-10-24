@@ -17,7 +17,7 @@ async function request(method, path, body) {
     const detail = await response.json().then((data) => data.detail, () => null);
     throw new Error(`${response.status} ${typeof detail === "string" ? detail : response.statusText}`);
   }
-  return response.json();
+  return response.status === 204 ? null : response.json();
 }
 
 /// PATCH /users/{id}: send the whole editable profile; empty strings clear a field.
@@ -41,4 +41,9 @@ export function updateUser(userId, profile) {
 /// then the backend runs the Jev match search. Returns { ..., match }.
 export function pushTask(userId, taskSummary, topic, filters = {}) {
   return request("POST", `/users/${userId}/push`, { task_summary: taskSummary, topic, filters });
+}
+
+/// DELETE /users/{id}/task: stop being matchable (curr_task removed).
+export function clearTask(userId) {
+  return request("DELETE", `/users/${userId}/task`);
 }
