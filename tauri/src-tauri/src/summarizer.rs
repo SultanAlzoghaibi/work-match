@@ -35,6 +35,9 @@ doing, not by the tools, commands or apps on screen:
 - LeetCode: coding interview practice problems
 - Job hunting, Apartment hunting, Shopping: searching for those
 - Other: anything else
+"focus": 2 to 4 words naming the specific subject inside that topic: the project,
+problem, concept, course material or place they are working on. Never a tool, app,
+website, command or file name, and never just the topic again.
 "task_summary": one sentence, at most 120 characters, that a stranger will read. Say what
 they are making, learning or looking for, and name the specific subject. Describe their goal,
 not the page: never copy a page title, and never name an app, website, tool, command or file,
@@ -73,9 +76,10 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
             "shareable":    { "type": "boolean" },
             // A fixed list, so the topic can't be a tool, page title or made-up label.
             "topic":        { "type": "string", "enum": KNOWN_TOPICS.iter().copied().chain([OTHER_TOPIC]).collect::<Vec<_>>() },
+            "focus":        { "type": "string", "maxLength": 40 },
             "task_summary": { "type": "string", "maxLength": 120 }
         },
-        "required": ["shareable", "topic", "task_summary"],
+        "required": ["shareable", "topic", "focus", "task_summary"],
         "additionalProperties": false
     })
 });
@@ -178,6 +182,10 @@ pub enum Source {
 pub struct ActivitySummary {
     pub shareable: bool,
     pub topic: String,
+    /// The specific subject within `topic`, e.g. topic "Coding", focus "desktop matching app".
+    /// Empty when the model's focus was missing or named a tool.
+    #[serde(default)]
+    pub focus: String,
     pub task_summary: String,
     pub source: Source,
     pub window_minutes: u32,
@@ -190,6 +198,7 @@ impl ActivitySummary {
         Self {
             shareable: false,
             topic: String::new(),
+            focus: String::new(),
             task_summary: String::new(),
             source,
             window_minutes,
@@ -202,6 +211,8 @@ impl ActivitySummary {
 struct ModelOutput {
     shareable: bool,
     topic: String,
+    #[serde(default)]
+    focus: String,
     task_summary: String,
 }
 
@@ -389,8 +400,9 @@ where
         match output {
             Ok(output) => {
                 return match clean(output) {
-                    Some((topic, task_summary)) => ActivitySummary {
+                    Some((topic, focus, task_summary)) => ActivitySummary {
                         shareable: true,
+                        focus,
                         topic: leetcode_topic(&topic, &captures, &apps)
                             .or_else(|| course_topic(&topic, &captures, &apps))
                             .unwrap_or(topic),
@@ -501,7 +513,28 @@ fn clock_time(unix_ms: i64) -> String {
 /// task_summary is shown to a stranger, so this is the last gate: both fields
 /// are scrubbed again, and anything that still looks like contact details,
 /// links or money makes the whole summary not shareable.
-fn clean(output: ModelOutput) -> Option<(String, String)> {
+/// Tool and app words that make a focus useless for matching ("yarn", "terminal").
+/// A focus containing one is dropped (the summary is still shared).
+const TOOL_WORDS: [&str; 16] = [
+    "yarn", "npm", "pnpm", "pip", "git", "github", "terminal", "zsh", "vs code", "vscode",
+    "rustrover", "intellij", "xcode", "docker", "chrome", "jupyter",
+];
+
+fn clean_focus(focus: &str, topic: &str) -> String {
+    let focus = first_words(&scrub(focus), 4, MAX_TOPIC_CHARS);
+    let lower = focus.to_lowercase();
+    let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    let names_a_tool = TOOL_WORDS.iter().any(|tool| match tool.contains(' ') {
+        true => lower.contains(tool),
+        false => words.contains(tool),
+    });
+    if focus.is_empty() || names_a_tool || looks_identifying(&focus) || lower == topic.to_lowercase() {
+        return String::new();
+    }
+    focus
+}
+
+fn clean(output: ModelOutput) -> Option<(String, String, String)> {
     if !output.shareable || output.topic.eq_ignore_ascii_case(OTHER_TOPIC) {
         return None;
     }
@@ -512,7 +545,8 @@ fn clean(output: ModelOutput) -> Option<(String, String)> {
     }
     let task_summary = cut_at_word(&task_summary, MAX_SUMMARY_CHARS);
     let topic = canonical_topic(&first_words(&topic, MAX_TOPIC_WORDS, MAX_TOPIC_CHARS), &task_summary);
-    (!topic.is_empty() && !task_summary.is_empty()).then_some((topic, task_summary))
+    let focus = clean_focus(&output.focus, &topic);
+    (!topic.is_empty() && !task_summary.is_empty()).then_some((topic, focus, task_summary))
 }
 
 fn looks_identifying(field: &str) -> bool {
@@ -596,6 +630,7 @@ mod tests {
         ModelOutput {
             shareable,
             topic: topic.into(),
+            focus: String::new(),
             task_summary: task_summary.into(),
         }
     }
@@ -608,7 +643,7 @@ mod tests {
     fn clean_keeps_a_good_label() {
         assert_eq!(
             clean(output(true, "leetcode", " Working through graph problems on LeetCode ")),
-            Some(("LeetCode".into(), "Working through graph problems on LeetCode".into()))
+            Some(("LeetCode".into(), String::new(), "Working through graph problems on LeetCode".into()))
         );
     }
 
@@ -643,7 +678,7 @@ mod tests {
     #[test]
     fn clean_truncates_long_fields() {
         let long_summary = "Working through graph problems ".repeat(10);
-        let (topic, task_summary) =
+        let (topic, _focus, task_summary) =
             clean(output(true, "graph algorithms practice for interviews", &long_summary)).unwrap();
         assert_eq!(topic, "graph algorithms practice");
         assert!(task_summary.chars().count() <= MAX_SUMMARY_CHARS);
@@ -818,6 +853,26 @@ mod tests {
         assert_eq!(leetcode_topic("Coursework", &captures, &[]).as_deref(), Some("LeetCode"));
         assert_eq!(leetcode_topic("Job hunting", &captures, &[]), None);
         assert_eq!(leetcode_topic("Coding", &[], &[]), None);
+    }
+
+    #[test]
+    fn focus_names_the_subject_never_a_tool() {
+        let with_focus = |focus: &str| ModelOutput { focus: focus.into(), ..output(true, "Coding", "Building a desktop app") };
+        assert_eq!(clean(with_focus("desktop matching app")).unwrap().1, "desktop matching app");
+        assert_eq!(clean(with_focus("Dijkstra's algorithm in Python today")).unwrap().1, "Dijkstra's algorithm in Python");
+        for tool in ["yarn", "yarn dev server", "Git rebase", "VS Code setup", "Coding", "jane@example.com"] {
+            let (topic, focus, _) = clean(with_focus(tool)).unwrap();
+            assert_eq!((topic.as_str(), focus.as_str()), ("Coding", ""), "{tool}");
+        }
+        // "gitlet" is a project, not git.
+        assert_eq!(clean(with_focus("Gitlet version control")).unwrap().1, "Gitlet version control");
+    }
+
+    #[test]
+    fn summaries_saved_before_focus_still_load() {
+        let old = r#"{"shareable":true,"topic":"LeetCode","task_summary":"Two Sum","source":"llama","window_minutes":5,"created_at":1}"#;
+        let summary: ActivitySummary = serde_json::from_str(old).unwrap();
+        assert_eq!(summary.focus, "");
     }
 
     #[test]

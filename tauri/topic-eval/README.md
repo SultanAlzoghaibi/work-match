@@ -33,11 +33,15 @@ judgment calls, so they're shown but not counted.
 
 ## Results (2026-10-24, Llama 3.2 3B Q4_K_M)
 
-| | Before | After |
-|---|---|---|
-| Tuning cases (24 counted) | 4/24 (17%) | **22/24 (92%)** |
-| **Held-out cases (10)** | 4/10 (40%) | **7/10 (70%)** |
-| Topics naming a tool or site (tuning + held-out) | 2 + 2 | **0 + 0** |
+| | Before | Fixed topic list | + focus |
+|---|---|---|---|
+| Tuning cases (24 counted) | 4/24 (17%) | 22/24 (92%) | 21/24 (88%) |
+| **Held-out cases (10)** | 4/10 (40%) | 7/10 (70%) | **8/10 (80%)** |
+| Topics naming a tool or site (tuning + held-out) | 2 + 2 | 0 + 0 | 0 + 0 |
+| Usable focus (tuning / held-out) | – | – | 22/24 · **10/10** |
+
+The held-out set was run once per version, after that version's tuning, and never
+tuned on. Differences of one case are within the model's run-to-run noise.
 
 **Before**, the prompt's example sentence ("Working through graph problems on LeetCode")
 was copied into unrelated summaries; for example, a hackathon backend got topic "LeetCode".
@@ -57,6 +61,12 @@ Topics were page-title fragments ("Google Maps", "Group by", "SQL Databases") or
    When Llama was allowed to write course codes itself, it made them up ("MIGR 202X").
 4. **LeetCode on screen** turns a coding or studying topic into "LeetCode", because the
    model is led by problem names ("Course Schedule" → Coursework).
+
+5. **A second field, `focus`**: 2 to 4 words naming the specific subject inside the
+   topic ("Coding" + "desktop matching app", "Coursework" + "pendulum period"). A focus
+   that names a tool (`yarn`, `git`, a terminal, an editor) or repeats the topic is
+   dropped, and the summary is still shared. The app sends it with each push; the backend
+   ignores it until its push model has a `focus` field.
 
 **Still wrong on held-out:** Spanish practice → Writing, a resume plus job listings →
 Writing (should be Job hunting), CS 70 probability homework → Web development. These

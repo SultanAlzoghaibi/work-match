@@ -51,6 +51,9 @@ struct Outcome {
     why: String,
     shareable: bool,
     topic: String,
+    focus: String,
+    /// A shared summary's focus is non-empty and names no tool or site.
+    focus_ok: bool,
     task_summary: String,
 }
 
@@ -108,6 +111,16 @@ fn judge(case: &Case, summary: &ActivitySummary) -> (bool, String) {
     (true, String::new())
 }
 
+/// Whole words, so "Gitlet" doesn't count as "git" (multi-word entries match as phrases).
+fn names_any(text: &str, words: &[String]) -> bool {
+    let lower = text.to_lowercase();
+    let tokens: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).filter(|t| !t.is_empty()).collect();
+    words.iter().any(|word| {
+        let word = word.to_lowercase();
+        if word.contains(' ') || word.contains('.') { lower.contains(&word) } else { tokens.contains(&word.as_str()) }
+    })
+}
+
 async fn ask(client: &reqwest::Client, url: &str, prompt: String) -> Result<String, String> {
     let body = json!({
         "messages": [
@@ -155,11 +168,13 @@ async fn topic_eval() {
         })
         .await;
         let (pass, why) = judge(case, &summary);
+        let focus_ok = !case.shareable || (!summary.focus.is_empty() && !names_any(&summary.focus, &case.bad_words));
         println!(
-            "{} {:28} {:30} {}{}",
+            "{} {:28} {:22} {:32} {}{}",
             if case.unsure { "?" } else if pass { "✓" } else { "✗" },
             case.name,
             if summary.shareable { format!("{:?}", summary.topic) } else { "(not shared)".into() },
+            if summary.shareable { format!("{}{:?}", if focus_ok { "" } else { "!" }, summary.focus) } else { String::new() },
             summary.task_summary,
             if why.is_empty() { String::new() } else { format!("   <- {why}") },
         );
@@ -170,16 +185,20 @@ async fn topic_eval() {
             why,
             shareable: summary.shareable,
             topic: summary.topic.clone(),
+            focus: summary.focus.clone(),
+            focus_ok,
             task_summary: summary.task_summary.clone(),
         });
     }
     let counted: Vec<&Outcome> = outcomes.iter().filter(|o| !o.unsure).collect();
     let passed = counted.iter().filter(|o| o.pass).count();
     let tool_topics = counted.iter().filter(|o| o.why.starts_with("topic names a tool")).count();
+    let focus_good = counted.iter().filter(|o| o.focus_ok).count();
     println!(
-        "\n{label}: {passed}/{} right ({:.0}%), {tool_topics} topics named a tool or site, {} unsure not counted",
+        "\n{label}: {passed}/{} right ({:.0}%), {tool_topics} topics named a tool or site, focus usable in {focus_good}/{}, {} unsure not counted",
         counted.len(),
         100.0 * passed as f64 / counted.len() as f64,
+        counted.len(),
         outcomes.len() - counted.len()
     );
     std::fs::write(dir.join(format!("results-{label}.json")), serde_json::to_string_pretty(&outcomes).unwrap()).unwrap();
