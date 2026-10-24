@@ -23,8 +23,12 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/wm_api_test \
   .venv/bin/python -m unittest discover tests -v
 ```
 
-## Deploy (Render)
+## Deploy (Google Cloud Run)
 
-`render.yaml` at the repo root describes the service. In Render: New → Blueprint →
-pick this repo, then fill in `DATABASE_URL` (and `OPENROUTER_API_KEY` for Jev).
-Every push to the deployed branch redeploys.
+The server is a plain container (`Dockerfile`), so it also runs on AWS App
+Runner/ECS or Fly without changes. It stores nothing; all data is in Supabase.
+
+```sh
+gcloud run deploy work-match-api --source backend --region us-west1 \
+  --allow-unauthenticated --set-env-vars DATABASE_URL=...
+```

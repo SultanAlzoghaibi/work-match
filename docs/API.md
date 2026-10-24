@@ -4,13 +4,12 @@ The Mac app's only way to reach the backend. The server (`backend/app`) talks
 to Supabase using the schema in `backend/schema.sql`; the app never touches the
 database directly. Flow and timing follow [DATABASE.md](DATABASE.md).
 
-- **Base URL:** `https://work-match-api.onrender.com` (Render), or `http://127.0.0.1:8000` locally
+- **Base URL:** `https://work-match-api-409766411876.us-west1.run.app` (Cloud Run, us-west1), or `http://127.0.0.1:8000` locally.
+  Keep it in one config setting in the app so the host can change later
 - **Auth:** `Authorization: Bearer <token>` on every call except `POST /users` and `GET /health`
 - **Errors:** `401` bad or missing token, `409` match gone/expired/already answered, `422` invalid body
 
-The free Render plan sleeps after 15 minutes without traffic, and the first
-request after that takes 30-60 s. Polling keeps it awake while anyone has the
-app open.
+Cloud Run scales to zero when idle; the first request after that takes ~2-3 s.
 
 ## `POST /users`: sign up
 
@@ -41,7 +40,7 @@ Both return the profile.
 → `{ "ok": true }`
 
 Replaces your `curr_task`, lights up your connections on this topic, then runs
-the Jev search for you in the background. A match shows up on the next poll.
+the Jev search for you before replying (allow ~2 s). A match shows up on the next poll.
 `task_summary` is shown to the person you match with, so the on-device summary
 must not contain file names, client names, or personal details.
 

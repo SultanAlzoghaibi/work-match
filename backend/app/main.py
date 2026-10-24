@@ -11,7 +11,7 @@ import secrets
 from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from . import db, matching
@@ -134,9 +134,10 @@ def run_search(me: int) -> None:
 
 
 @app.post("/push")
-def push(body: Push, background: BackgroundTasks, me: int = Depends(current_user)):
+def push(body: Push, me: int = Depends(current_user)):
     """Every 5 min: replace my current task, refresh my 'active' rows, then run
-    the Jev search for me in the background."""
+    the Jev search for me. The search runs before replying because hosts like
+    Cloud Run and Lambda pause the CPU once the response is sent."""
     with db.connection() as conn:
         conn.execute(
             """insert into curr_task (user_id, task_summary, topic) values (%s, %s, %s)
@@ -150,7 +151,7 @@ def push(body: Push, background: BackgroundTasks, me: int = Depends(current_user
                select id, %(me)s from connections where %(me)s in (user_a, user_b) and topic = %(topic)s""",
             {"me": me, "topic": body.topic},
         )
-    background.add_task(run_search, me)
+    run_search(me)
     return {"ok": True}
 
 
