@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // Liquid glass popup for a match. Rust polls the backend every 3 s and emits
 // "match-state" whenever the match changes; we also ask for it on load in case
@@ -14,6 +15,12 @@ const AGE_LABELS = {
 };
 
 const popup = document.getElementById("popup");
+
+// Drag the popup by anything that isn't a button.
+popup.addEventListener("mousedown", (event) => {
+  if (event.button !== 0 || event.target.closest("button")) return;
+  getCurrentWindow().startDragging();
+});
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);

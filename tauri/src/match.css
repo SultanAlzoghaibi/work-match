@@ -14,6 +14,9 @@ body {
 }
 
 #popup {
+  cursor: grab;
+  /* Keeps white text readable on the lightly tinted clear glass. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   height: 100%;
   box-sizing: border-box;
   padding: 16px 18px;
@@ -62,6 +65,7 @@ p {
 }
 
 button {
+  text-shadow: none;
   font: inherit;
   color: inherit;
   border: none;

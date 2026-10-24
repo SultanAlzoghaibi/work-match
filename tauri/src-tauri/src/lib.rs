@@ -218,7 +218,9 @@ fn apply_window_style(window: &WebviewWindow) {
         apply_liquid_glass(
             window,
             NSGlassEffectViewStyle::Clear,
-            Some((0, 0, 0, 200)),
+            // Light tint so the clear glass stays see-through; the CSS adds a
+            // text shadow for readability.
+            Some((0, 0, 0, 70)),
             Some(22.0),
         )
         .expect("liquid glass unsupported");
