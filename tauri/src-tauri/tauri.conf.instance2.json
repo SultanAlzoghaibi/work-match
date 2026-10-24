@@ -3,7 +3,7 @@
   "productName": "work-match 2",
   "identifier": "com.sultanalzoghaibi.workmatch2",
   "build": {
-    "beforeDevCommand": "VITE_PORT=1421 yarn dev",
+    "beforeDevCommand": "yarn dev:instance2",
     "devUrl": "http://localhost:1421"
   }
 }

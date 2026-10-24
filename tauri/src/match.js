@@ -19,6 +19,10 @@ const AGE_LABELS = {
 
 const popup = document.getElementById("popup");
 
+// match.css tints the popup on Windows, where there's no Liquid Glass.
+const os = await invoke("os_name").catch(() => "unknown");
+document.documentElement.classList.add(`os-${os}`);
+
 // Drag the popup by anything that isn't a button.
 popup.addEventListener("mousedown", (event) => {
   if (event.button !== 0 || event.target.closest("button")) return;

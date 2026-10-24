@@ -68,6 +68,20 @@ body {
   cursor: grabbing;
 }
 
+/* Windows keeps its native title bar (the overlay title bar is macOS-only), so
+   this strip sits under it: no traffic-light gap, and no second app name. */
+.os-windows .titlebar {
+  padding-left: 16px;
+}
+
+.os-windows .titlebar-user {
+  left: 16px;
+}
+
+.os-windows .titlebar-title {
+  visibility: hidden;
+}
+
 .titlebar-title {
   font-family: var(--font-display);
   font-size: 15px;

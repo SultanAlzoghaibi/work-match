@@ -12,7 +12,9 @@ mod summarizer;
 mod window;
 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
+#[cfg(any(target_os = "macos", windows))]
+use tauri::WebviewWindow;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 pub const MAIN_LABEL: &str = "main";
@@ -182,6 +184,8 @@ pub fn run() {
                 window::to_match_panel(&match_window)?;
                 apply_window_style(&match_window);
             }
+            #[cfg(windows)]
+            apply_window_style(&match_window);
 
             // Red close button hides instead of quitting (Quit is in the tray).
             let app_for_close = app.handle().clone();
@@ -292,5 +296,29 @@ fn apply_window_style(window: &WebviewWindow) {
     } else {
         apply_vibrancy(window, NSVisualEffectMaterial::HudWindow, None, Some(22.0))
             .expect("vibrancy unsupported");
+    }
+}
+
+/// Windows 11: dark Mica. Windows 10: dark acrylic. match.css also tints the
+/// popup on Windows, so its white text stays readable if neither applies.
+#[cfg(windows)]
+fn apply_window_style(window: &WebviewWindow) {
+    use window_vibrancy::{apply_acrylic, apply_mica};
+    use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND};
+
+    if apply_mica(window, Some(true)).is_err() && apply_acrylic(window, Some((18, 18, 24, 160))).is_err() {
+        eprintln!("[window] no Mica or acrylic on this Windows version; the popup uses its CSS background");
+    }
+    // Undecorated windows have square corners; Windows 11 can round them like
+    // the macOS panel (Windows 10 ignores this).
+    if let Ok(hwnd) = window.hwnd() {
+        let _ = unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                &DWMWCP_ROUND as *const _ as *const _,
+                std::mem::size_of_val(&DWMWCP_ROUND) as u32,
+            )
+        };
     }
 }

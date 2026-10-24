@@ -8,7 +8,7 @@ sidecar (`bundle.externalBin` in `tauri.conf.json`), so it has to be in this fol
 | Platform | File |
 |---|---|
 | macOS, Apple Silicon | `llama-server-aarch64-apple-darwin` |
-| Windows x64 (testing only) | `llama-server-x86_64-pc-windows-msvc.exe` |
+| Windows x64 | `llama-server-x86_64-pc-windows-msvc.exe` |
 
 The binaries are gitignored. When the file is missing, `build.rs` puts an empty
 placeholder here, so the app still builds and prints a cargo warning. At runtime the app
@@ -37,12 +37,25 @@ The script clones tag b11669 (override with `LLAMA_TAG=...`), builds only `llama
 with `BUILD_SHARED_LIBS=OFF` and the Metal shaders embedded, and prints `otool -L`. The
 output should list only system libraries.
 
-## Windows (testing only)
+## Windows x64: build it
 
-Download `llama-b11669-bin-win-cpu-x64.zip` from the release. Copy `llama-server.exe`
-here as `llama-server-x86_64-pc-windows-msvc.exe`, and copy the zip's `.dll` files to
-`src-tauri/target/debug/`, next to where Tauri copies the sidecar. A Windows release build
-would also need the DLLs bundled, which isn't set up.
+The release zip (`llama-b11669-bin-win-cpu-x64.zip`) splits `llama-server.exe` into a
+small launcher plus `llama`/`ggml`/OpenMP DLLs. A sidecar has to be a single file, so build
+a static one instead. You need Visual Studio 2022 with **Desktop development with C++**
+(the script uses its bundled cmake if cmake isn't on PATH) and git:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build-llama-server.ps1   # -> llama-server-x86_64-pc-windows-msvc.exe
+```
+
+The script clones tag b11669 into `%TEMP%` (override with `$env:LLAMA_TAG`), builds only
+`llama-server` with `BUILD_SHARED_LIBS=OFF`, the static C runtime and OpenMP off, and
+prints `dumpbin /dependents`. The output should list only Windows system DLLs. Like the
+macOS build, it targets the CPU it's built on, so build it on each demo laptop rather than
+copying the file between machines.
+
+On Windows the app puts llama-server in a job object, so it stops whenever the app exits,
+crashes or is restarted by `tauri dev`.
 
 ## After replacing a binary
 
@@ -55,7 +68,7 @@ touch binaries/llama-server-aarch64-apple-darwin                                
 (Get-Item binaries\llama-server-x86_64-pc-windows-msvc.exe).LastWriteTime = Get-Date  # PowerShell
 ```
 
-`build-llama-server.sh` uses plain `cp`, so its output already gets a fresh timestamp.
+`build-llama-server.sh` and `build-llama-server.ps1` already give their output a fresh timestamp.
 
 ## wm-ocr (screen text)
 

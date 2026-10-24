@@ -13,7 +13,7 @@ import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logou
 // the user agent. macOS gets native liquid glass, so the page stays clear;
 // everything else paints a CSS semi-transparent background.
 const os = await invoke("os_name").catch(() => "unknown");
-document.documentElement.classList.add(os === "macos" ? "os-macos" : "os-other");
+document.documentElement.classList.add(`os-${os}`); // os-macos, os-windows, os-linux
 
 // Rust polls GET /users/{id}/poll every 3 s and shows the match popup. Starts
 // once someone is signed in (see render).
@@ -980,7 +980,7 @@ function renderProfileTab(profile) {
           "div",
           {},
           el("button", { class: "link", onclick: () => signOut().catch(renderError) }, "Log out"),
-          el("button", { class: "link", title: "Quit work-match (⌘Q)", onclick: quitApp }, "Quit"),
+          el("button", { class: "link", title: `Quit work-match (${os === "macos" ? "⌘Q" : "Ctrl+Q"})`, onclick: quitApp }, "Quit"),
         ),
         el("button", { class: "primary", onclick: () => renderEdit(profile) }, "Edit"),
       ),

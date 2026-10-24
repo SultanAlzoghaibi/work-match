@@ -84,7 +84,8 @@ fn is_private_app(app: &AppSession) -> bool {
 }
 
 fn is_private_app_name(name: &str) -> bool {
-    PRIVATE_APPS.iter().any(|private| name.eq_ignore_ascii_case(private))
+    // Whole words, so "Microsoft Outlook" (macOS name, Windows FileDescription) counts.
+    PRIVATE_APPS.iter().any(|private| name.split_whitespace().any(|word| word.eq_ignore_ascii_case(private)))
 }
 
 /// A browser window showing a private page (its title names the site).
@@ -742,6 +743,14 @@ mod tests {
             started_at,
             ended_at,
         }
+    }
+
+    #[test]
+    fn private_app_names_match_whole_words() {
+        assert!(is_private_app(&app("Microsoft Outlook", "", 0, 1)));
+        assert!(is_private_app(&app("Slack", "", 0, 1)));
+        assert!(!is_private_app(&app("Visual Studio Code", "dijkstra.py", 0, 1)));
+        assert!(!is_private_app(&app("Mailspring Notes", "", 0, 1)));
     }
 
     #[test]

@@ -133,7 +133,8 @@ forced to `LeetCode` (`canonical_topic` in `summarizer.rs`).
 
 1. **llama-server:** build or place the sidecar as described in
    [tauri/src-tauri/binaries/README.md](../tauri/src-tauri/binaries/README.md). On a Mac
-   that's `sh tauri/src-tauri/binaries/build-llama-server.sh`.
+   that's `sh tauri/src-tauri/binaries/build-llama-server.sh`; on Windows,
+   `powershell -ExecutionPolicy Bypass -File tauri\src-tauri\binaries\build-llama-server.ps1`.
 2. **Model:** download `Llama-3.2-3B-Instruct-Q4_K_M.gguf` (2.0 GB), or the 1B file as a
    lighter fallback, into
    `~/Library/Application Support/com.sultanalzoghaibi.workmatch/models/`
@@ -190,6 +191,8 @@ sqlite3 ~/Library/Application\ Support/com.sultanalzoghaibi.workmatch/activity_b
   "select id, source, host, path, length(text) from captures; select json from last_summary;"
 ```
 
+On Windows the file is `%APPDATA%\com.sultanalzoghaibi.workmatch\activity_buffer.sqlite`.
+
 A capture without the extension's `Origin` is rejected:
 
 ```sh
@@ -200,17 +203,26 @@ curl -i -X POST http://127.0.0.1:47321/capture -H 'Content-Type: application/jso
 Log lines: `[capture] <host> <n> chars`, `[llm] llama-server ready`,
 `[api] summary source=Llama shareable=true topic="LeetCode"`.
 
-### Still to check on a Mac
+### Platform checks
 
-The pipeline was built and tested on Windows. These parts are macOS-only and haven't been
-run yet:
+The pipeline runs on macOS and Windows; these parts differ per platform.
+
+macOS:
 
 - `build-llama-server.sh` produces a static binary (`otool -L` lists only system
   libraries), and the 3B model answers quickly on Metal.
 - After a `tauri dev` rebuild, the next launch logs `stopped a llama-server left over from
-  an earlier run` (the pid-file cleanup, Unix only), and only one `llama-server` is running.
-- The glass panel and the tray menu still look and behave as before, with the new
-  **Share my activity** checkbox.
+  an earlier run` (the pid-file cleanup), and only one `llama-server` is running.
+- The glass panel and the tray menu look and behave as before.
+
+Windows:
+
+- `build-llama-server.ps1` produces a single exe (`dumpbin /dependents` lists only Windows
+  system DLLs).
+- `taskkill /F /IM work_match.exe` leaves no `llama-server.exe` behind (the job object),
+  and the next launch binds 8089 again.
+- The Dev tab's app sessions show VS Code with its title, Store apps such as Calculator by
+  name (not `ApplicationFrameHost`), and browsers with no title.
 
 ## Built with Llama
 

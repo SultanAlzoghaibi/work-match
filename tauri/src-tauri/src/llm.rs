@@ -94,6 +94,7 @@ pub fn start(app: &AppHandle) -> Llm {
             return llm;
         }
     };
+    tie_to_app(child.pid());
     if let Some(pid_file) = &llm.0.pid_file {
         if let Err(err) = std::fs::write(pid_file, child.pid().to_string()) {
             eprintln!("[llm] could not write {}: {err}", pid_file.display());
@@ -359,6 +360,47 @@ fn kill_orphan(pid_file: &Path) {
 
 #[cfg(not(unix))]
 fn kill_orphan(_pid_file: &Path) {}
+
+/// Windows has no process groups, so an app that's killed or crashes (`tauri dev`
+/// kills it on every rebuild) would leave llama-server holding the port. A job
+/// object that kills its processes when its last handle closes ties the server
+/// to this process instead, so no pid-file cleanup is needed.
+#[cfg(windows)]
+fn tie_to_app(pid: u32) {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
+
+    let tied = unsafe {
+        (|| -> windows::core::Result<()> {
+            // Never closed on purpose: Windows closes it when this process exits,
+            // and that kills the server.
+            let job = CreateJobObjectW(None, PCWSTR::null())?;
+            let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION as *const _,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            )?;
+            let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid)?;
+            let assigned = AssignProcessToJobObject(job, process);
+            let _ = CloseHandle(process);
+            assigned
+        })()
+    };
+    if let Err(err) = tied {
+        eprintln!("[llm] could not tie llama-server to the app ({err}); it may outlive a crash");
+    }
+}
+
+#[cfg(not(windows))]
+fn tie_to_app(_pid: u32) {}
 
 #[cfg(test)]
 mod tests {

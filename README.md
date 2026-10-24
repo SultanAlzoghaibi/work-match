@@ -15,7 +15,7 @@ If it clicks, add her as a connection and join a call with her (or a Discord cal
 ## Architecture
 
 ```
-Tauri app (on your Mac)                          Backend (Supabase)                Jev
+Tauri app (Mac/Windows)                          Backend (Supabase)                Jev
 ───────────────────────                          ──────────────────                ───
 reads current app, URLs, page HTML
   → filters out private stuff (blocklist)
@@ -40,14 +40,16 @@ quit or pause ──────────────────────
 ## Repo layout
 
 - `backend/` – matching server and database schema (`schema.sql`)
-- `tauri/` – macOS menu-bar (tray) desktop app
+- `tauri/` – tray desktop app for macOS and Windows
 - `extension/` – Chrome extension that sends the active tab's text to the desktop app
   (see [docs/activity-capture.md](docs/activity-capture.md))
 
 ## Platforms
 
-- **macOS (main target):** menu-bar only app (no dock icon). Clicking the tray globe opens a native **Liquid Glass** panel on macOS 26+, with a vibrancy blur fallback on older macOS.
-- **Windows (supported, not the focus):** same tray app. The window uses a CSS semi-transparent background instead of native glass.
+- **macOS:** menu-bar only app (no dock icon). The match popup is a native **Liquid Glass** panel on macOS 26+, with a vibrancy blur fallback on older macOS. Window titles need the Accessibility permission (macOS asks once).
+- **Windows 10/11:** the same app in the system tray (it may sit in the tray's overflow ^ until you pin it). The main window keeps the normal Windows title bar, and the match popup uses Mica on Windows 11 or acrylic on Windows 10, with a dark tint. Window titles need no permission; browser window titles are never recorded, since they show incognito tabs too.
+- Every `yarn` command below works the same in Terminal (macOS) and PowerShell (Windows).
+- **Windows + OneDrive:** keep the repo outside OneDrive (for example `C:\dev\work-match`). OneDrive syncing the multi-GB `tauri/src-tauri/target*` build folders locks files mid-build and slows builds down.
 
 ## Run the desktop app
 
@@ -57,7 +59,7 @@ yarn
 yarn dev1   # instance 1 (same as yarn tauri dev)
 ```
 
-### Two instances on one Mac (to test matching)
+### Two instances on one computer (to test matching)
 
 Each instance is a separate person with its own port, local SQLite and backend user:
 
@@ -65,13 +67,14 @@ Each instance is a separate person with its own port, local SQLite and backend u
 |---|---|---|
 | Command | `yarn dev1` | `yarn dev2` |
 | Vite dev port | 1420 | 1421 |
-| Local SQLite | `~/Library/Application Support/com.sultanalzoghaibi.workmatch/work_match.db` | `~/Library/Application Support/com.sultanalzoghaibi.workmatch2/work_match.db` |
+| Local SQLite (macOS) | `~/Library/Application Support/com.sultanalzoghaibi.workmatch/work_match.db` | `~/Library/Application Support/com.sultanalzoghaibi.workmatch2/work_match.db` |
+| Local SQLite (Windows) | `%APPDATA%\com.sultanalzoghaibi.workmatch\work_match.db` | `%APPDATA%\com.sultanalzoghaibi.workmatch2\work_match.db` |
 | Backend user (`MOCK_USER_ID`) | `00000000-0000-0000-0000-000000000000` | `00000000-0000-0000-0000-000000000001` |
 | Rust build dir | `src-tauri/target` | `src-tauri/target-instance2` |
 
-Run them in two terminals. Instance 2's settings live in `src-tauri/tauri.conf.instance2.json`; its first build takes a few minutes because it compiles into its own folder. You'll see two globes in the menu bar. Both use the same FastAPI on port 8000, so seed both users with `backend/seed.sql` first.
+Run them in two terminals. Instance 2's settings live in `src-tauri/tauri.conf.instance2.json`; its first build takes a few minutes because it compiles into its own folder. You'll see two globes in the menu bar (macOS) or the system tray (Windows). Both use the same FastAPI on port 8000, so seed both users with `backend/seed.sql` first.
 
-Left-click the smiling globe in the menu bar to open the app window. Closing the window keeps work-match running in the menu bar; right-click → Quit to exit.
+Left-click the smiling globe in the menu bar or tray to open the app window. Closing the window keeps work-match running there; right-click → Quit (or Cmd+Q / Ctrl+Q in the window) to exit.
 
 ## Run the backend
 
