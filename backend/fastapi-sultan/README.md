@@ -17,7 +17,22 @@ How matching works: [`../../docs/DATABASE.md`](../../docs/DATABASE.md).
 | `GET` | `/health` | Checks the DB connection |
 | `GET` | `/users/{id}` | Public profile (no token) |
 | `PATCH` | `/users/{id}` | Updates only the fields sent: `name`, `school`, `bio`, `discord_handle`, `age_group`, `country`, `sharing_enabled`. `null` clears a field (except `name` / `sharing_enabled`) |
-| `POST` | `/users/{id}/push` | Body `{task_summary, topic}`. Overwrites the user's `curr_task` row and refreshes their `is_working_on_connections` rows. Match search: TODO |
+| `POST` | `/users/{id}/push` | Body `{task_summary, topic, filters?: {same_country, same_age_group}}`. Overwrites the user's `curr_task`, refreshes their `is_working_on_connections` rows, then runs the match search (below). Response includes `match: {match_id, other_name, scores, skipped_reason}` |
+| `GET` | `/users/{id}/poll` | The user's matches from the last 15 min, newest first: `my_status`, `their_status`, `expired`, and `other` (the other person's profile + live task). The app calls it every 3 s |
+| `POST` | `/users/{id}/matches/{match_id}/respond` | Body `{accept}`. Sets the user's side while it's pending, nobody declined and the 2-min popup hasn't expired; otherwise 409 |
+
+## Match search (`app/matching.py`, `app/jev.py`)
+
+After each push:
+1. **Prefilter** (`CANDIDATES_SQL`): other users with sharing on, pushed in the last 11 min, same under-18 group, not already connected on the topic, no decline between the pair in the last `DECLINE_COOLDOWN_MINUTES`, plus the optional `same_country` / `same_age_group` filters. The pusher must have sharing on too.
+2. **Score**: one Jev request (TypeSafe `jev-latest`, key `JEV_API`) with a yes/no question per candidate (up to 20). Same-activity pairs score ~0.9, unrelated ~0.05.
+3. **Match**: best candidate with score ≥ `MATCH_THRESHOLD` → `create_match()`, which skips anyone who already has a pending popup.
+
+| `.env` | Default | |
+|---|---|---|
+| `JEV_API` | (required) | TypeSafe Jev key; check it with `.venv/bin/python test_jev.py` |
+| `MATCH_THRESHOLD` | `0.8` | Minimum Jev score to create a match |
+| `DECLINE_COOLDOWN_MINUTES` | `1440` | How long a declined pair isn't re-matched; `0` while testing |
 
 `users.id` is a UUID. Until sign-up exists, the Tauri app always uses
 `00000000-0000-0000-0000-000000000000` (`MOCK_USER_ID` in `tauri/src/api.js`), which

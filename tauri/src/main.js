@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { MOCK_USER_ID, pushTask, updateUser } from "./api.js";
+import { API_URL, MOCK_USER_ID, pushTask, updateUser } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { AGE_GROUPS, loadProfile, logout, mockLogin, saveProfile } from "./profile.js";
 
@@ -8,6 +8,9 @@ import { AGE_GROUPS, loadProfile, logout, mockLogin, saveProfile } from "./profi
 // everything else paints a CSS semi-transparent background.
 const os = await invoke("os_name").catch(() => "unknown");
 document.documentElement.classList.add(os === "macos" ? "os-macos" : "os-other");
+
+// Rust polls GET /users/{id}/poll every 3 s and shows the match popup.
+invoke("start_match_polling", { userId: MOCK_USER_ID, apiUrl: API_URL }).catch(console.error);
 
 const root = document.getElementById("root");
 
@@ -18,8 +21,18 @@ let syncStatus = null;
 
 /// Buttons that push a random mock summary to curr_task, so matching can be
 /// tested before the on-device summarizer exists.
+function matchLine(match) {
+  if (match.match_id != null) return `Matched with ${match.other_name} (${match.scores[0].score.toFixed(2)}). Check the popup.`;
+  if (match.skipped_reason) return `No match: ${match.skipped_reason}.`;
+  const best = match.scores[0];
+  return best ? `No match: best was ${best.name} at ${best.score.toFixed(2)} (needs 0.80).` : "No match.";
+}
+
 function renderTaskDemo() {
   const status = el("p", { class: "task-status muted" }, "Not sharing a task yet.");
+  const matchStatus = el("p", { class: "task-status muted" });
+  const sameCountry = el("input", { type: "checkbox" });
+  const sameAgeGroup = el("input", { type: "checkbox" });
   const buttons = Object.entries(MOCK_TASKS).map(([kind, task]) => {
     const button = el(
       "button",
@@ -29,12 +42,18 @@ function renderTaskDemo() {
           const summary = randomSummary(kind);
           button.disabled = true;
           try {
-            const saved = await pushTask(MOCK_USER_ID, summary, task.topic);
+            matchStatus.textContent = "Looking for a match…";
+            const saved = await pushTask(MOCK_USER_ID, summary, task.topic, {
+              same_country: sameCountry.checked,
+              same_age_group: sameAgeGroup.checked,
+            });
             status.className = "task-status";
             status.replaceChildren(el("strong", {}, `${saved.topic}: `), saved.task_summary);
+            matchStatus.textContent = matchLine(saved.match);
           } catch (err) {
             status.className = "task-status error";
             status.textContent = `Couldn't push: ${err.message}`;
+            matchStatus.textContent = "";
           } finally {
             button.disabled = false;
           }
@@ -49,7 +68,14 @@ function renderTaskDemo() {
     { class: "task-demo" },
     el("span", { class: "label" }, "Push a random task (demo)"),
     el("div", { class: "task-buttons" }, ...buttons),
+    el(
+      "div",
+      { class: "task-filters" },
+      el("label", { class: "toggle" }, sameCountry, el("span", {}, "Only same country")),
+      el("label", { class: "toggle" }, sameAgeGroup, el("span", {}, "Only same age group")),
+    ),
     status,
+    matchStatus,
   );
 }
 

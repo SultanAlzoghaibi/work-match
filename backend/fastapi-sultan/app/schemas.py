@@ -38,11 +38,34 @@ class UserUpdate(BaseModel):
         return value.upper() if value else value
 
 
+class PushFilters(BaseModel):
+    """Optional match filters, compared against my own profile."""
+
+    same_country: bool = False
+    same_age_group: bool = False
+
+
 class TaskPush(BaseModel):
     """What the app is working on now, summarized on the device."""
 
     task_summary: str = Field(min_length=1, max_length=1000)
     topic: str | None = Field(default=None, max_length=60)   # short label, e.g. "LeetCode"
+    filters: PushFilters = PushFilters()
+
+
+class CandidateScore(BaseModel):
+    user_id: UUID
+    name: str
+    score: float
+
+
+class MatchResult(BaseModel):
+    """Outcome of the match search run by a push."""
+
+    match_id: int | None
+    other_name: str | None
+    scores: list[CandidateScore]                 # Jev P(good match), best first
+    skipped_reason: str | None                   # why no search ran / nothing scored
 
 
 class CurrTask(BaseModel):
@@ -50,3 +73,35 @@ class CurrTask(BaseModel):
     task_summary: str
     topic: str | None
     pushed_at: datetime
+    match: MatchResult
+
+
+MatchStatus = Literal["pending", "accepted", "declined"]
+
+
+class OtherPerson(BaseModel):
+    """The other side of a match: public profile plus their live task."""
+
+    id: UUID
+    name: str
+    school: str | None
+    bio: str | None
+    age_group: AgeGroup | None
+    country: str | None
+    discord_handle: str | None
+    task_summary: str | None
+
+
+class MatchView(BaseModel):
+    match_id: int
+    topic: str
+    score: float | None
+    created_at: datetime
+    my_status: MatchStatus
+    their_status: MatchStatus
+    expired: bool                                # still undecided after 2 min
+    other: OtherPerson
+
+
+class RespondBody(BaseModel):
+    accept: bool

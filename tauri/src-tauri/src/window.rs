@@ -63,7 +63,7 @@ pub fn hide_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 /// Match popup size in points; keep in sync with the "match" window in tauri.conf.json.
 #[cfg(target_os = "macos")]
-const MATCH_SIZE: NSSize = NSSize::new(340.0, 200.0);
+const MATCH_SIZE: NSSize = NSSize::new(340.0, 260.0);
 /// Gap between the menu bar / screen edge and the popup.
 #[cfg(target_os = "macos")]
 const EDGE_GAP: f64 = 8.0;

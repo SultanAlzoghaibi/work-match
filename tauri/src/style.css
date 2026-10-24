@@ -112,6 +112,16 @@ button.secondary:hover {
   gap: 8px;
 }
 
+.task-filters {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.task-filters .toggle {
+  margin-top: 0;
+}
+
 .task-status {
   font-size: 12px;
   line-height: 1.4;

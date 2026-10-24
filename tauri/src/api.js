@@ -37,7 +37,8 @@ export function updateUser(userId, profile) {
   });
 }
 
-/// POST /users/{id}/push: overwrite what this user is working on (curr_task).
-export function pushTask(userId, taskSummary, topic) {
-  return request("POST", `/users/${userId}/push`, { task_summary: taskSummary, topic });
+/// POST /users/{id}/push: overwrite what this user is working on (curr_task),
+/// then the backend runs the Jev match search. Returns { ..., match }.
+export function pushTask(userId, taskSummary, topic, filters = {}) {
+  return request("POST", `/users/${userId}/push`, { task_summary: taskSummary, topic, filters });
 }

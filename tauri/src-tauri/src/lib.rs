@@ -55,7 +55,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_nspanel::init());
 
     builder
-        .manage(match_popup::PendingMatch::default())
+        .manage(match_popup::MatchState::default())
         .setup(|app| {
             // Accessory: no dock icon, lives only in the menu bar.
             #[cfg(target_os = "macos")]
@@ -151,6 +151,8 @@ pub fn run() {
             match_popup::trigger_mock_match,
             match_popup::current_match,
             match_popup::respond_match,
+            match_popup::dismiss_match,
+            match_popup::start_match_polling,
             sharing::get_sharing,
             sharing::set_sharing,
             summarizer::get_last_summary,
