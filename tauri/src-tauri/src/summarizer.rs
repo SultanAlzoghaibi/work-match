@@ -608,9 +608,13 @@ fn reconcile_topic(label: &str, activity: &str) -> String {
     chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
+/// "main.js", "App.jsx", "hw3.ipynb": a file name says what's open, not what they're doing.
+static FILE_NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\w\.[A-Za-z][A-Za-z0-9]{0,4}\b").unwrap());
+
 fn clean_focus(focus: &str, topic: &str) -> String {
     let focus = first_words(&scrub(focus), 4, MAX_TOPIC_CHARS);
-    if focus.is_empty() || names_a_tool(&focus) || looks_identifying(&focus) || focus.eq_ignore_ascii_case(topic) {
+    let names_a_file = FILE_NAME.is_match(&focus);
+    if focus.is_empty() || names_a_tool(&focus) || names_a_file || looks_identifying(&focus) || focus.eq_ignore_ascii_case(topic) {
         return String::new();
     }
     focus
@@ -958,6 +962,10 @@ mod tests {
             let (topic, _, focus, _) = clean(with_focus(tool)).unwrap();
             assert_eq!((topic.as_str(), focus.as_str()), ("Coding", ""), "{tool}");
         }
+        for file in ["main.js", "App.jsx component", "hw3.ipynb"] {
+            assert_eq!(clean(with_focus(file)).unwrap().2, "", "{file}");
+        }
+        assert_eq!(clean(with_focus("Node.js REST API")).unwrap().2, "", "a dotted tech name is dropped too, which is fine");
         // "gitlet" is a project, not git.
         assert_eq!(clean(with_focus("Gitlet version control")).unwrap().2, "Gitlet version control");
     }

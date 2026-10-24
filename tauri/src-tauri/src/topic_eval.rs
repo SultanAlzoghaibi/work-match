@@ -177,6 +177,10 @@ async fn topic_eval() {
         .await;
         // The model's own words for the activity, before it picked a label.
         let raw_reply = serde_json::from_str::<Value>(&raw.lock().unwrap()).unwrap_or_default();
+        if std::env::var("TOPIC_EVAL_RAW").is_ok() {
+            println!("model reply: {raw_reply}");
+            println!("pushed to the backend: {}", serde_json::to_string(&crate::api::push_payload(&summary)).unwrap());
+        }
         let model_activity = format!(
             "{} → {}",
             raw_reply["activity"].as_str().unwrap_or(""),
