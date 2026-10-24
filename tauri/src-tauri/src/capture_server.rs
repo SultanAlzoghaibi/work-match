@@ -67,6 +67,18 @@ pub fn router(state: CaptureState) -> Router {
         .with_state(state)
 }
 
+/// 0 = starting, 1 = listening, 2 = couldn't bind (another instance has the port).
+static LISTENING: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// For the Dev tab.
+pub fn listening_status() -> &'static str {
+    match LISTENING.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => "listening",
+        2 => "failed",
+        _ => "starting",
+    }
+}
+
 /// Serves on 127.0.0.1 only, never on other interfaces.
 pub fn start(buffer: Buffer, sharing: Sharing) {
     let state = CaptureState {
@@ -78,10 +90,12 @@ pub fn start(buffer: Buffer, sharing: Sharing) {
         let listener = match tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, PORT)).await {
             Ok(listener) => listener,
             Err(err) => {
+                LISTENING.store(2, std::sync::atomic::Ordering::Relaxed);
                 eprintln!("[capture] can't listen on 127.0.0.1:{PORT}: {err}");
                 return;
             }
         };
+        LISTENING.store(1, std::sync::atomic::Ordering::Relaxed);
         println!("[capture] listening on 127.0.0.1:{PORT}");
         if let Err(err) = axum::serve(listener, router(state)).await {
             eprintln!("[capture] server stopped: {err}");

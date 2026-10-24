@@ -2,7 +2,7 @@
 // ever leaves the laptop, and only when the summary is shareable.
 use crate::summarizer::ActivitySummary;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Exactly the body of the backend push (see PUSH in backend/schema.sql).
 #[derive(Debug, PartialEq, Serialize)]
@@ -67,6 +67,9 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
                 );
                 if crate::collecting_data::debug_logs() {
                     println!("[api] backend match result: {}", saved["match"]);
+                }
+                if let Some(dev) = app.try_state::<crate::collecting_data::dev::DevState>() {
+                    dev.record_push(saved.clone());
                 }
                 // The main window shows what was shared and the match result.
                 let _ = app.emit_to(crate::MAIN_LABEL, "activity-pushed", saved);

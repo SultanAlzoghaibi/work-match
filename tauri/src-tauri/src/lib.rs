@@ -207,6 +207,9 @@ pub fn run() {
             summarizer::get_last_summary,
             summarizer::summarize_now,
             collecting_data::app_tracker::get_app_sessions,
+            collecting_data::dev::dev_status,
+            collecting_data::dev::dev_captures,
+            collecting_data::dev::dev_last_run,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -232,6 +235,7 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
 
     buffer::start_sweeper(buffer.clone());
     capture_server::start(buffer.clone(), sharing.clone());
+    app.manage(collecting_data::dev::DevState::default());
     app.manage(buffer);
     app.manage(sharing);
     app.manage(llm::start(app.handle()));

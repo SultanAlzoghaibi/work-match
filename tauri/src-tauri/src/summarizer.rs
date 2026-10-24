@@ -3,6 +3,8 @@
 // will read. Runs the local Llama model; nothing here leaves the device.
 use crate::buffer::{self, Buffer, Capture};
 use crate::collecting_data::app_tracker::{self, AppSession};
+use crate::collecting_data::dev::{DevState, LastRun};
+use std::sync::Arc;
 use crate::llm::Llm;
 use crate::scrub::scrub;
 use crate::sharing::Sharing;
@@ -120,21 +122,24 @@ pub fn start(app: AppHandle) {
     let buffer = app.state::<Buffer>().inner().clone();
     let sharing = app.state::<Sharing>().inner().clone();
     let llm = app.state::<Llm>().inner().clone();
+    let dev = app.state::<DevState>().inner().clone();
     let db_path = crate::db::get_db_path(&app);
 
     tauri::async_runtime::spawn(async move {
         // The topic is remembered with the sharing epoch it was learned in, so a
         // pause forgets it along with the buffer.
         let mut previous_topic = last_shareable_topic(&buffer).map(|topic| (sharing.epoch(), topic));
+        dev.set_next_summary_at(buffer::now_ms() + first_run.as_millis() as i64);
         tokio::time::sleep(first_run).await;
         let mut ticker = tokio::time::interval(every);
         // After the laptop sleeps, run once on wake instead of catching up on every missed tick.
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         loop {
             ticker.tick().await;
+            dev.set_next_summary_at(buffer::now_ms() + every.as_millis() as i64);
             let apps = recent_apps(db_path.as_deref(), window_minutes);
             if let Some(summary) =
-                run_once(&buffer, &sharing, &llm, &apps, &mut previous_topic, window_minutes).await
+                run_once(&buffer, &sharing, &llm, &dev, &apps, &mut previous_topic, window_minutes).await
             {
                 let _ = app.emit("activity-summary", &summary);
                 crate::api::on_summary(&app, &summary);
@@ -158,6 +163,7 @@ pub async fn summarize_now(app: AppHandle) -> Result<ActivitySummary, String> {
     let buffer = app.state::<Buffer>().inner().clone();
     let sharing = app.state::<Sharing>().inner().clone();
     let llm = app.state::<Llm>().inner().clone();
+    let dev = app.state::<DevState>().inner().clone();
     if !sharing.is_on() {
         return Err("Share my activity is off: turn it on in the tray menu".into());
     }
@@ -165,7 +171,7 @@ pub async fn summarize_now(app: AppHandle) -> Result<ActivitySummary, String> {
     println!("[summarizer] summarize now (requested from the app)");
     let mut previous_topic = last_shareable_topic(&buffer).map(|topic| (sharing.epoch(), topic));
     let apps = recent_apps(crate::db::get_db_path(&app).as_deref(), WINDOW_MINUTES);
-    let summary = run_once(&buffer, &sharing, &llm, &apps, &mut previous_topic, WINDOW_MINUTES)
+    let summary = run_once(&buffer, &sharing, &llm, &dev, &apps, &mut previous_topic, WINDOW_MINUTES)
         .await
         .ok_or("sharing was turned off while summarizing")?;
     let _ = app.emit("activity-summary", &summary);
@@ -179,6 +185,7 @@ async fn run_once(
     buffer: &Buffer,
     sharing: &Sharing,
     llm: &Llm,
+    dev: &DevState,
     apps: &[AppSession],
     previous_topic: &mut Option<(u64, String)>,
     window_minutes: u32,
@@ -202,11 +209,30 @@ async fn run_once(
         .as_ref()
         .filter(|(learned_in, _)| *learned_in == epoch)
         .map(|(_, topic)| topic.as_str());
-    let summary = summarize(&captures, apps, hint, buffer::now_ms(), window_minutes, |prompt| {
+    // Record what the model read and replied, for the Dev tab.
+    let seen = Arc::new(std::sync::Mutex::new((None::<String>, Vec::<String>::new())));
+    let started_at = buffer::now_ms();
+    let summary = summarize(&captures, apps, hint, started_at, window_minutes, |prompt| {
         let llm = llm.clone();
-        async move { llm.chat(SYSTEM_PROMPT, &prompt, &SCHEMA).await }
+        let seen = seen.clone();
+        seen.lock().unwrap().0 = Some(prompt.clone());
+        async move {
+            let reply = llm.chat(SYSTEM_PROMPT, &prompt, &SCHEMA).await;
+            seen.lock().unwrap().1.push(match &reply {
+                Ok(text) => text.clone(),
+                Err(err) => format!("error: {err}"),
+            });
+            reply
+        }
     })
     .await;
+    let (prompt, replies) = seen.lock().unwrap().clone();
+    dev.record_run(LastRun {
+        at: started_at,
+        prompt,
+        replies,
+        summary: serde_json::to_value(&summary).unwrap_or_default(),
+    });
 
     if let Some(max_id) = captures.iter().map(|capture| capture.id).max() {
         // On failure the rows are read again next time, and swept within 6 minutes regardless.

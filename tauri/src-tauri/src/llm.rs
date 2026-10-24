@@ -132,6 +132,15 @@ impl Llm {
         *self.0.status.borrow()
     }
 
+    /// For the Dev tab: "ready", "starting" or "down".
+    pub fn status_label(&self) -> &'static str {
+        match self.status() {
+            Status::Ready => "ready",
+            Status::Starting => "starting",
+            Status::Down => "down",
+        }
+    }
+
     fn child(&self) -> std::sync::MutexGuard<'_, Option<CommandChild>> {
         self.0.child.lock().unwrap_or_else(PoisonError::into_inner)
     }

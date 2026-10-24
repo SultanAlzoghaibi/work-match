@@ -75,3 +75,8 @@ export function pushTask(userId, taskSummary, topic, filters = {}) {
 export function clearTask(userId) {
   return request("DELETE", `/users/${userId}/task`);
 }
+
+/// GET /users/{id}/task-history: past pushes, newest first (Dev tab).
+export function getTaskHistory(userId, limit = 20) {
+  return request("GET", `/users/${userId}/task-history?limit=${limit}`);
+}

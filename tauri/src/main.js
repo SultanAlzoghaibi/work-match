@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { API_URL, MOCK_USER_ID, clearTask, getFilters, pushTask, saveFilters, updateUser, uploadAvatar } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
+import { renderDevTab } from "./devTab.js";
 import { SCHOOLS } from "./schools.js";
 import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logout, mockLogin, resizeImage, saveAvatarUrl, saveProfile } from "./profile.js";
 
@@ -104,6 +105,48 @@ let lastPush = null; // { summary, topic, match } from the latest push, or { err
 let sessionTimer = null;
 const taskUi = { status: null, matchStatus: null, countdown: null, stopButton: null, pushNote: null };
 
+/// The latest push, demo or real, for the "Your summary" card:
+/// { topic, summary, source, at, match } or { skipped, at } for a real
+/// summary that wasn't shareable.
+let latestSummary = null;
+const summaryUi = { card: null };
+
+function setLatestSummary(next) {
+  latestSummary = { ...next, at: Date.now() };
+  updateSummaryCard();
+}
+
+function updateSummaryCard() {
+  const { card } = summaryUi;
+  if (!card?.isConnected) return;
+  if (!latestSummary) {
+    card.replaceChildren(
+      el("h3", { class: "section-title" }, "Your summary"),
+      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Pick a task above, or turn on sharing and press ⚡ Push now to summarize your real activity."),
+    );
+    return;
+  }
+  const minutes = Math.floor((Date.now() - latestSummary.at) / 60_000);
+  const when = minutes < 1 ? "just now" : `${minutes} min ago`;
+  if (latestSummary.skipped) {
+    card.replaceChildren(
+      el("h3", { class: "section-title" }, "Your summary"),
+      el("p", {}, latestSummary.skipped),
+      el("p", { class: "muted fine-print" }, when),
+    );
+    return;
+  }
+  card.replaceChildren(
+    el("h3", { class: "section-title" }, "Your summary"),
+    el("div", { class: "summary-head" }, el("span", { class: "topic-pill" }, latestSummary.topic), el("span", { class: "muted fine-print" }, `${latestSummary.source} · ${when}`)),
+    el("p", { class: "summary-text" }, latestSummary.summary),
+    latestSummary.match ? el("p", { class: "fine-print" }, matchLine(latestSummary.match)) : null,
+  );
+}
+
+// Refresh "x min ago" while the card is visible.
+setInterval(updateSummaryCard, 30_000);
+
 /// "Push now": don't wait for the 5-minute timer. A running demo task pushes
 /// its next example (and restarts the timer); otherwise the real summarizer
 /// summarizes the last 5 minutes of activity and pushes that.
@@ -139,10 +182,20 @@ async function pushNow() {
 /// the server) if it's off, so the backend doesn't skip you as "not sharing".
 async function ensureSharing() {
   const profile = await loadProfile();
-  if (!profile || profile.sharing_enabled) return;
-  const shared = { ...profile, sharing_enabled: 1 };
-  await saveProfile(shared);
-  await updateUser(MOCK_USER_ID, shared).catch((err) => console.warn("sharing sync failed", err));
+  const trackingOn = await invoke("get_sharing").catch(() => false);
+  if (profile?.sharing_enabled && trackingOn) return;
+  await setSharing(true);
+}
+
+/// The one sharing switch: Thang's set_sharing turns real tracking on/off
+/// (tray "Share my activity", app tracker, Chrome capture, summarizer) and
+/// saves curr_user_profile.sharing_enabled; then the server is told too.
+async function setSharing(on) {
+  await invoke("set_sharing", { enabled: on }).catch((err) => console.warn("set_sharing failed", err));
+  const profile = await loadProfile();
+  if (profile) {
+    await updateUser(MOCK_USER_ID, { ...profile, sharing_enabled: on }).catch((err) => console.warn("sharing sync failed", err));
+  }
 }
 
 async function startSession(kind, filters) {
@@ -190,6 +243,12 @@ async function tickSession() {
       const saved = await pushTask(MOCK_USER_ID, current.summary, current.topic, current.filters);
       if (session === current) {
         lastPush = { summary: saved.task_summary, topic: saved.topic, match: saved.match };
+        setLatestSummary({
+          topic: saved.topic,
+          summary: saved.task_summary,
+          source: `demo: ${MOCK_TASKS[current.kind].label}`,
+          match: saved.match,
+        });
       }
     } catch (err) {
       if (session === current) lastPush = { error: `Couldn't push: ${err.message}` };
@@ -217,9 +276,22 @@ listen("match-state", (event) => {
 // Rust) push on their own; show the latest one like a demo push.
 listen("activity-pushed", (event) => {
   const saved = event.payload;
-  if (session) return; // a manual demo search is running; its own status wins
+  setLatestSummary({ topic: saved.topic, summary: saved.task_summary, source: "from your activity", match: saved.match });
+  if (session) return; // a manual demo search is running; its own status line wins
   lastPush = { summary: saved.task_summary, topic: `${saved.topic} (from your activity)`, match: saved.match };
   updateTaskUi();
+});
+
+// A real 5-minute summary that wasn't shareable isn't pushed; say so.
+listen("activity-summary", (event) => {
+  const summary = event.payload;
+  if (summary.shareable) return; // activity-pushed covers shared ones
+  setLatestSummary({
+    skipped:
+      summary.source === "idle"
+        ? "Your last 5 minutes had no captured activity, so nothing was pushed."
+        : "Your last 5 minutes weren't shared (e.g. email or banking, or a detail like a price in the summary).",
+  });
 });
 
 function formatWait(ms) {
@@ -657,6 +729,7 @@ function tabBar(profile) {
     tab("friends", "Work friends"),
     tab("filters", "Filters"),
     tab("profile", "Your profile"),
+    import.meta.env.DEV ? tab("dev", "Dev") : null,
   );
 }
 
@@ -671,18 +744,22 @@ function renderProfile(profile) {
         ? renderFriendsTab()
         : activeTab === "filters"
           ? renderFiltersTab(profile)
-          : renderProfileTab(profile),
+          : activeTab === "dev"
+            ? renderDevTab({ onPushNow: pushNow })
+            : renderProfileTab(profile),
     ),
   );
 }
 
 /// Work friends: find someone new, and see / join existing friends.
 function renderFriendsTab() {
+  queueMicrotask(updateSummaryCard);
   return el(
     "div",
     { class: "tab-body" },
     friendFindingButton(),
     renderTaskDemo(),
+    (summaryUi.card = el("div", { class: "summary-card" })),
     renderFriends(),
     // Demo only: raise the liquid glass match popup with mock data.
     el(
@@ -729,7 +806,7 @@ function renderProfileTab(profile) {
         detailRow("Discord", profile.discord_handle, inlineEditor(profile, "discord_handle", textInput(profile, "discord_handle", { maxlength: "40" }))),
         detailRow("Languages", parseLanguages(profile.languages).join(", "), inlineEditor(profile, "languages", textInput(profile, "languages", { maxlength: "200", placeholder: "English, Arabic" }))),
         detailRow("Sharing", profile.sharing_enabled ? "On" : "Off", () =>
-          saveAndSync({ ...profile, sharing_enabled: !profile.sharing_enabled }),
+          setSharing(!profile.sharing_enabled).then(render, renderError),
         ),
         schoolOptions(),
       ),
@@ -794,6 +871,7 @@ function renderEdit(profile) {
         const data = Object.fromEntries(new FormData(form));
         data.sharing_enabled = sharing.checked;
         data.country = (data.country ?? "").toUpperCase();
+        await invoke("set_sharing", { enabled: sharing.checked }).catch(console.warn);
         await saveAndSync(data);
       },
     },

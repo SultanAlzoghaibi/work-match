@@ -166,6 +166,11 @@ pub fn get_app_sessions(app: AppHandle, limit: Option<u32>) -> Result<Vec<AppSes
     Ok(sessions)
 }
 
+/// For the Dev tab: can we read window titles? Never prompts.
+pub fn accessibility_granted() -> bool {
+    platform::accessibility_trusted(false)
+}
+
 pub fn start(app: AppHandle) {
     let Some(db_path) = crate::db::get_db_path(&app) else {
         eprintln!("[app-tracker] no database path; not tracking apps");
