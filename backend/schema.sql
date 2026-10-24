@@ -32,8 +32,19 @@ create table users (
     avatar_url      text,                                        -- public URL in Storage bucket 'avatars'; null = show initial
     age_group       text        check (age_group in ('under_18','18_24','25_34','35_44','45_plus')),
     country         char(2),                                     -- ISO code, e.g. 'CA'
+    languages       text[]      not null default '{}',           -- e.g. {English,Arabic}; used by filters
     sharing_enabled boolean     not null default false,
     created_at      timestamptz not null default now()
+);
+
+-- 1b. Who each person is willing to be matched with. One row per user; no row =
+--     no filters. Matching is mutual: both people's filters must allow the pair.
+create table user_filters (
+    user_id         uuid        primary key references users(id) on delete cascade,
+    age_groups      text[]      not null default '{}',           -- allowed age groups; empty = any
+    countries       char(2)[]   not null default '{}',           -- allowed countries (ISO); empty = anywhere
+    shared_language boolean     not null default false,          -- only people who share a language with me
+    updated_at      timestamptz not null default now()
 );
 
 -- 2. What each person is doing right now. One row per user, overwritten every push,
@@ -108,6 +119,7 @@ create table is_working_on_connections (
 -- Only the backend (service role) touches these tables. RLS on with no policies
 -- blocks direct reads from the app's anon key.
 alter table users                     enable row level security;
+alter table user_filters              enable row level security;
 alter table curr_task                 enable row level security;
 alter table curr_task_history         enable row level security;
 alter table matches                   enable row level security;

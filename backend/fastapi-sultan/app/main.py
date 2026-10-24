@@ -20,6 +20,7 @@ from .schemas import (
     KeepBody,
     MatchView,
     RespondBody,
+    Filters,
     TaskHistoryItem,
     TaskPush,
     User,
@@ -43,7 +44,7 @@ app.add_middleware(
 )
 
 USER_COLUMNS = sql.SQL(
-    "id, name, school, career, bio, discord_handle, avatar_url, age_group, country, sharing_enabled, created_at"
+    "id, name, school, career, bio, discord_handle, avatar_url, age_group, country, languages, sharing_enabled, created_at"
 )
 
 
@@ -185,7 +186,7 @@ select m.id as match_id, m.topic, m.score, m.created_at,
        case when m.user_a = %(me)s then m.b_keep else m.a_keep end as their_keep,
        exists (select 1 from connections c
                where c.user_a = m.user_a and c.user_b = m.user_b and c.topic = m.topic) as connected,
-       u.id as other_id, u.name, u.school, u.career, u.bio, u.age_group, u.country, u.discord_handle, u.avatar_url,
+       u.id as other_id, u.name, u.school, u.career, u.bio, u.age_group, u.country, u.discord_handle, u.avatar_url, u.languages,
        t.task_summary
 from matches m
 join users u on u.id = case when m.user_a = %(me)s then m.user_b else m.user_a end
@@ -198,7 +199,7 @@ def _match_view(row: dict) -> dict:
     other = {
         "id": row["other_id"],
         **{key: row[key] for key in ("name", "school", "career", "bio", "age_group", "country",
-                                     "discord_handle", "avatar_url", "task_summary")},
+                                     "discord_handle", "avatar_url", "languages", "task_summary")},
     }
     view = {key: row[key] for key in ("match_id", "topic", "score", "created_at",
                                       "my_status", "their_status", "expired",
@@ -341,3 +342,36 @@ def task_history(user_id: UUID, limit: int = Query(default=50, ge=1, le=500)) ->
             """,
             (user_id, limit),
         ).fetchall()
+
+
+
+# FILTERS (Filters tab): who I'm willing to be matched with. No row = no filters.
+@app.get("/users/{user_id}/filters", response_model=Filters)
+def get_filters(user_id: UUID) -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            "select age_groups, countries, shared_language from user_filters where user_id = %s",
+            (user_id,),
+        ).fetchone()
+    return row or Filters().model_dump()
+
+
+@app.put("/users/{user_id}/filters", response_model=Filters)
+def save_filters(user_id: UUID, filters: Filters) -> dict:
+    try:
+        with connect() as conn:
+            return conn.execute(
+                """
+                insert into user_filters (user_id, age_groups, countries, shared_language)
+                values (%s, %s, %s, %s)
+                on conflict (user_id) do update set
+                    age_groups = excluded.age_groups,
+                    countries = excluded.countries,
+                    shared_language = excluded.shared_language,
+                    updated_at = now()
+                returning age_groups, countries, shared_language
+                """,
+                (user_id, filters.age_groups, filters.countries, filters.shared_language),
+            ).fetchone()
+    except errors.ForeignKeyViolation:
+        raise HTTPException(404, "user not found") from None

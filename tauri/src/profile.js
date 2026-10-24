@@ -5,7 +5,19 @@ import { MOCK_USER_ID } from "./api.js";
 export const DEFAULT_NAME = MOCK_USER_ID.endsWith("1") ? "James2" : "sultan1";
 
 // The single curr_user_profile row (id = 1). token NULL = signed out.
-export const PROFILE_FIELDS = ["name", "school", "career", "bio", "age_group", "country", "discord_handle"];
+export const PROFILE_FIELDS = ["name", "school", "career", "bio", "age_group", "country", "discord_handle", "languages"];
+
+/// Suggestions for the Languages field (any language can be typed).
+export const LANGUAGES = [
+  "English", "Arabic", "Spanish", "French", "Mandarin", "Hindi", "Urdu", "Punjabi",
+  "Portuguese", "Russian", "Japanese", "Korean", "German", "Italian", "Vietnamese",
+  "Tagalog", "Persian", "Turkish", "Bengali", "Cantonese",
+];
+
+/// "English, Arabic" (stored text) <-> ["English", "Arabic"].
+export function parseLanguages(text) {
+  return [...new Set((text ?? "").split(",").map((language) => language.trim()).filter(Boolean))];
+}
 
 export const AGE_GROUPS = [
   ["under_18", "Under 18"],
@@ -50,7 +62,7 @@ export async function saveProfile(profile) {
   await db.execute(
     `UPDATE curr_user_profile
      SET name = $1, school = $2, career = $3, bio = $4, age_group = $5, country = $6,
-         discord_handle = $7, sharing_enabled = $8
+         discord_handle = $7, languages = $8, sharing_enabled = $9
      WHERE id = 1`,
     [...values, profile.sharing_enabled ? 1 : 0],
   );

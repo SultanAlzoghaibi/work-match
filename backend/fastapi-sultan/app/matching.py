@@ -30,12 +30,23 @@ CANDIDATES_SQL = """
 select t.user_id, t.task_summary, u.name
 from curr_task t
 join users u on u.id = t.user_id
+join users me on me.id = %(me)s
+left join user_filters mf on mf.user_id = me.id                       -- my filters
+left join user_filters cf on cf.user_id = u.id                        -- their filters
 where t.user_id <> %(me)s
   and u.sharing_enabled
   and t.pushed_at > now() - interval '11 minutes'                     -- skip dead laptops
   and coalesce(u.age_group = 'under_18', false) = %(me_minor)s        -- minors only with minors
   and (not %(same_country)s or u.country = %(my_country)s)
   and (not %(same_age_group)s or u.age_group = %(my_age_group)s)
+  -- Saved filters (Filters tab), mutual: both people's filters must allow the pair.
+  -- Empty list = any. A filter on age/country excludes people who haven't set theirs.
+  and (cardinality(coalesce(mf.age_groups, '{}')) = 0 or u.age_group = any(mf.age_groups))
+  and (cardinality(coalesce(cf.age_groups, '{}')) = 0 or me.age_group = any(cf.age_groups))
+  and (cardinality(coalesce(mf.countries, '{}')) = 0 or u.country = any(mf.countries))
+  and (cardinality(coalesce(cf.countries, '{}')) = 0 or me.country = any(cf.countries))
+  and (not (coalesce(mf.shared_language, false) or coalesce(cf.shared_language, false))
+       or u.languages && me.languages)                                -- share at least one language
   and not exists (                                                    -- already connected on topic
       select 1 from connections c
       where c.user_a = least(%(me)s, t.user_id) and c.user_b = greatest(%(me)s, t.user_id)
@@ -165,13 +176,13 @@ def refresh_active_connections(conn, me: UUID, my_summary: str) -> list[dict]:
 
 
 FRIEND_COLUMNS = ("name", "school", "career", "bio", "age_group", "country",
-                  "discord_handle", "avatar_url", "task_summary")
+                  "discord_handle", "avatar_url", "languages", "task_summary")
 
 CONNECTIONS_SQL = """
 select c.id as connection_id, c.topic, c.created_at,
        w.seen_at,
        u.id as friend_id, u.name, u.school, u.career, u.bio, u.age_group, u.country,
-       u.discord_handle, u.avatar_url, t.task_summary
+       u.discord_handle, u.avatar_url, u.languages, t.task_summary
 from connections c
 join users u on u.id = case when c.user_a = %(me)s then c.user_b else c.user_a end
 left join is_working_on_connections w on w.connection_id = c.id and w.user_id = u.id

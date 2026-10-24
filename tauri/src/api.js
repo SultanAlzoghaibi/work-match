@@ -34,8 +34,22 @@ export function updateUser(userId, profile) {
     discord_handle: blankToNull(profile.discord_handle),
     age_group: blankToNull(profile.age_group),
     country: blankToNull(profile.country),
+    languages: (profile.languages ?? "")
+      .split(",")
+      .map((language) => language.trim())
+      .filter(Boolean),
     sharing_enabled: Boolean(profile.sharing_enabled),
   });
+}
+
+/// Match filters (Filters tab). Matching is mutual: both people's filters
+/// must allow the pair. Empty lists mean "anyone".
+export function getFilters(userId) {
+  return request("GET", `/users/${userId}/filters`);
+}
+
+export function saveFilters(userId, filters) {
+  return request("PUT", `/users/${userId}/filters`, filters);
 }
 
 /// POST /users/{id}/avatar: upload a profile picture (a JPEG blob). Returns the

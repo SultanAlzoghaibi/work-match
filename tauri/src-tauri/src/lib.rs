@@ -67,6 +67,12 @@ pub fn run() {
             sql: include_str!("migrations/005_app_sessions.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "languages",
+            sql: include_str!("migrations/006_languages.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     let builder = tauri::Builder::default()

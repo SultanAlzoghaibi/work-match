@@ -3,10 +3,10 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/700.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { API_URL, MOCK_USER_ID, clearTask, pushTask, updateUser, uploadAvatar } from "./api.js";
+import { API_URL, MOCK_USER_ID, clearTask, getFilters, pushTask, saveFilters, updateUser, uploadAvatar } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { SCHOOLS } from "./schools.js";
-import { AGE_GROUPS, DEFAULT_NAME, loadProfile, logout, mockLogin, resizeImage, saveAvatarUrl, saveProfile } from "./profile.js";
+import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logout, mockLogin, resizeImage, saveAvatarUrl, saveProfile } from "./profile.js";
 
 // Same idea as TyA's getOs(): ask Rust for the target OS instead of sniffing
 // the user agent. macOS gets native liquid glass, so the page stays clear;
@@ -220,21 +220,9 @@ function updateTaskUi() {
 }
 
 function renderTaskDemo() {
-  const sameCountry = el("input", { type: "checkbox" });
-  const sameAgeGroup = el("input", { type: "checkbox" });
+  // Who you can be matched with comes from the Filters tab (saved on the server).
   const buttons = Object.entries(MOCK_TASKS).map(([kind, task]) =>
-    el(
-      "button",
-      {
-        class: "secondary",
-        onclick: () =>
-          startSession(kind, {
-            same_country: sameCountry.checked,
-            same_age_group: sameAgeGroup.checked,
-          }),
-      },
-      task.label,
-    ),
+    el("button", { class: "secondary", onclick: () => startSession(kind, {}) }, task.label),
   );
   taskUi.stopButton = el(
     "button",
@@ -250,12 +238,6 @@ function renderTaskDemo() {
     el("h3", { class: "section-title" }, "Find someone now"),
     el("span", { class: "label" }, "Share a task and search until matched (demo)"),
     el("div", { class: "task-buttons" }, ...buttons, taskUi.stopButton),
-    el(
-      "div",
-      { class: "task-filters" },
-      el("label", { class: "toggle" }, sameCountry, el("span", {}, "Only same country")),
-      el("label", { class: "toggle" }, sameAgeGroup, el("span", {}, "Only same age group")),
-    ),
     taskUi.countdown,
     taskUi.status,
     taskUi.matchStatus,
@@ -502,6 +484,105 @@ function paintTitlebarUser(profile) {
   slot.replaceChildren(mini, el("span", { "data-tauri-drag-region": "" }, profile.name || DEFAULT_NAME));
 }
 
+// --- Filters tab ------------------------------------------------------------
+
+/// Who you're willing to be matched with, saved on the server (user_filters).
+/// Matching is mutual: a pair only matches if both people's filters allow it.
+function renderFiltersTab(profile) {
+  const body = el("div", { class: "tab-body filters" }, el("p", { class: "muted" }, "Loading your filters…"));
+  getFilters(MOCK_USER_ID)
+    .then((filters) => body.replaceChildren(filtersForm(profile, filters)))
+    .catch((err) => body.replaceChildren(el("p", { class: "error" }, `Couldn't load filters: ${err.message}`)));
+  return body;
+}
+
+function filtersForm(profile, filters) {
+  const status = el("p", { class: "task-status" });
+
+  // Age: allowed groups; none checked = anyone.
+  const ageBoxes = AGE_GROUPS.map(([key, label]) => {
+    const box = el("input", { type: "checkbox", value: key });
+    box.checked = filters.age_groups.includes(key);
+    return el("label", { class: "chip" }, box, el("span", {}, label));
+  });
+
+  // Location: my country quick toggle plus any other ISO codes.
+  const myCountry = (profile.country ?? "").toUpperCase();
+  const onlyMine = el("input", { type: "checkbox" });
+  onlyMine.checked = Boolean(myCountry) && filters.countries.includes(myCountry);
+  onlyMine.disabled = !myCountry;
+  const otherCountries = el("input", {
+    value: filters.countries.filter((country) => country !== myCountry).join(", "),
+    placeholder: "Other countries, e.g. US, GB",
+    maxlength: "80",
+  });
+
+  // Language: only people who share one of my languages.
+  const myLanguages = parseLanguages(profile.languages);
+  const sharedLanguage = el("input", { type: "checkbox" });
+  sharedLanguage.checked = filters.shared_language;
+
+  const save = el(
+    "button",
+    {
+      class: "primary",
+      onclick: async () => {
+        const countries = otherCountries.value
+          .split(",")
+          .map((country) => country.trim().toUpperCase())
+          .filter(Boolean);
+        if (onlyMine.checked && myCountry) countries.unshift(myCountry);
+        status.className = "task-status";
+        status.textContent = "Saving…";
+        try {
+          await saveFilters(MOCK_USER_ID, {
+            age_groups: ageBoxes.map((chip) => chip.querySelector("input")).filter((box) => box.checked).map((box) => box.value),
+            countries,
+            shared_language: sharedLanguage.checked,
+          });
+          status.textContent = "Saved. New searches use these filters.";
+        } catch (err) {
+          status.className = "task-status error";
+          status.textContent = `Couldn't save: ${err.message}`;
+        }
+      },
+    },
+    "Save filters",
+  );
+
+  return el(
+    "div",
+    { class: "filters-card" },
+    el("h3", { class: "section-title" }, "Who you match with"),
+    el("p", { class: "muted fine-print" }, "Both people's filters have to allow a match. Leave a section empty for anyone."),
+    el("span", { class: "label" }, "Age"),
+    el("div", { class: "chips" }, ...ageBoxes),
+    el("span", { class: "label" }, "Location"),
+    el(
+      "label",
+      { class: "toggle" },
+      onlyMine,
+      el("span", {}, myCountry ? `People in my country (${myCountry})` : "People in my country (set your country in Your profile)"),
+    ),
+    otherCountries,
+    el("span", { class: "label" }, "Language"),
+    el(
+      "label",
+      { class: "toggle" },
+      sharedLanguage,
+      el("span", {}, "Only people who share a language with me"),
+    ),
+    el(
+      "p",
+      { class: "muted fine-print" },
+      myLanguages.length
+        ? `Your languages: ${myLanguages.join(", ")} (edit in Your profile)`
+        : "Add your languages in Your profile for this to match anyone.",
+    ),
+    el("footer", {}, status, save),
+  );
+}
+
 /// Which main-window tab is showing; kept across re-renders (e.g. after Save).
 let activeTab = "friends";
 
@@ -518,7 +599,13 @@ function tabBar(profile) {
       },
       label,
     );
-  return el("nav", { class: "tabs" }, tab("friends", "Work friends"), tab("profile", "Your profile"));
+  return el(
+    "nav",
+    { class: "tabs" },
+    tab("friends", "Work friends"),
+    tab("filters", "Filters"),
+    tab("profile", "Your profile"),
+  );
 }
 
 function renderProfile(profile) {
@@ -528,7 +615,11 @@ function renderProfile(profile) {
       "section",
       { class: "app" },
       tabBar(profile),
-      activeTab === "friends" ? renderFriendsTab() : renderProfileTab(profile),
+      activeTab === "friends"
+        ? renderFriendsTab()
+        : activeTab === "filters"
+          ? renderFiltersTab(profile)
+          : renderProfileTab(profile),
     ),
   );
 }
@@ -584,6 +675,7 @@ function renderProfileTab(profile) {
         detailRow("Age group", ageLabel(profile.age_group), inlineEditor(profile, "age_group", () => ageSelectFor(profile.age_group))),
         detailRow("Country", profile.country, inlineEditor(profile, "country", textInput(profile, "country", { maxlength: "2", placeholder: "CA" }))),
         detailRow("Discord", profile.discord_handle, inlineEditor(profile, "discord_handle", textInput(profile, "discord_handle", { maxlength: "40" }))),
+        detailRow("Languages", parseLanguages(profile.languages).join(", "), inlineEditor(profile, "languages", textInput(profile, "languages", { maxlength: "200", placeholder: "English, Arabic" }))),
         detailRow("Sharing", profile.sharing_enabled ? "On" : "Off", () =>
           saveAndSync({ ...profile, sharing_enabled: !profile.sharing_enabled }),
         ),
@@ -663,6 +755,8 @@ function renderEdit(profile) {
     el("label", { class: "field" }, el("span", {}, "Age group"), ageSelect),
     textField("Country", "country", profile.country, { maxlength: "2", placeholder: "CA" }),
     textField("Discord", "discord_handle", profile.discord_handle, { maxlength: "40" }),
+    textField("Languages", "languages", profile.languages, { maxlength: "200", placeholder: "English, Arabic", list: "language-options" }),
+    el("datalist", { id: "language-options" }, ...LANGUAGES.map((name) => el("option", { value: name }))),
     el("label", { class: "toggle" }, sharing, el("span", {}, "Share what I'm working on")),
     el(
       "footer",

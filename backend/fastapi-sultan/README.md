@@ -18,6 +18,7 @@ How matching works: [`../../docs/DATABASE.md`](../../docs/DATABASE.md).
 | `GET` | `/users/{id}` | Public profile (no token) |
 | `PATCH` | `/users/{id}` | Updates only the fields sent: `name`, `school`, `bio`, `discord_handle`, `age_group`, `country`, `sharing_enabled`. `null` clears a field (except `name` / `sharing_enabled`) |
 | `POST` | `/users/{id}/push` | Body `{task_summary, topic, filters?: {same_country, same_age_group}}`. Overwrites the user's `curr_task`, refreshes their `is_working_on_connections` rows, then runs the match search (below). Response includes `match: {match_id, other_name, scores, skipped_reason}` |
+| `GET` / `PUT` | `/users/{id}/filters` | Saved match filters (`user_filters`): `age_groups`, `countries` (ISO), `shared_language`. Empty = anyone. Matching is mutual: both people's filters must allow the pair, checked in the SQL prefilter before Jev runs |
 | `GET` | `/users/{id}/task-history?limit=50` | The user's past pushes from `curr_task_history`, newest first (`limit` 1–500). Every push appends a row; quit / pause don't delete them |
 | `DELETE` | `/users/{id}/task` | Removes the user's `curr_task` and active rows (QUIT / PAUSE). The app calls it when a 30 s demo session ends, on Stop and on Quit |
 | `GET` | `/users/{id}/poll` | The user's matches from the last 15 min, newest first: `my_status`, `their_status`, `expired`, and `other` (the other person's profile + live task). The app calls it every 3 s |

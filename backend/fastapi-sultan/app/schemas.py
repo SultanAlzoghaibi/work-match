@@ -19,6 +19,7 @@ class User(BaseModel):
     avatar_url: str | None
     age_group: AgeGroup | None
     country: str | None
+    languages: list[str]
     sharing_enabled: bool
     created_at: datetime
 
@@ -34,6 +35,19 @@ class UserUpdate(BaseModel):
     age_group: AgeGroup | None = None
     country: str | None = Field(default=None, pattern=r"^[A-Za-z]{2}$")
     sharing_enabled: bool | None = None
+    languages: list[str] | None = Field(default=None, max_length=10)
+
+    @field_validator("languages")
+    @classmethod
+    def clean_languages(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        cleaned = []
+        for language in value:
+            language = language.strip()[:30]
+            if language and language not in cleaned:
+                cleaned.append(language)
+        return cleaned
 
     @field_validator("country")
     @classmethod
@@ -100,6 +114,7 @@ class OtherPerson(BaseModel):
     country: str | None
     discord_handle: str | None
     avatar_url: str | None
+    languages: list[str] = []
     task_summary: str | None
 
 
@@ -142,3 +157,26 @@ class TaskHistoryItem(BaseModel):
     task_summary: str
     topic: str | None
     pushed_at: datetime
+
+
+class Filters(BaseModel):
+    """Who I'm willing to be matched with (user_filters). Empty list = any.
+
+    Matching is mutual: a pair only matches if both people's filters allow it.
+    """
+
+    age_groups: list[AgeGroup] = []
+    countries: list[str] = Field(default=[], max_length=20)
+    shared_language: bool = False
+
+    @field_validator("countries")
+    @classmethod
+    def iso_countries(cls, value: list[str]) -> list[str]:
+        cleaned = []
+        for country in value:
+            country = country.strip().upper()
+            if len(country) != 2 or not country.isalpha():
+                raise ValueError(f"country must be a 2-letter ISO code, got {country!r}")
+            if country not in cleaned:
+                cleaned.append(country)
+        return cleaned

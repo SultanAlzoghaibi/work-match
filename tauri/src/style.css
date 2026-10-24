@@ -647,3 +647,50 @@ input[type="checkbox"]:checked::after {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* --- Filters tab ----------------------------------------------------------- */
+
+.filters-card {
+  padding: 20px;
+  border: var(--outline);
+  border-radius: var(--radius-card);
+  background: var(--color-lavender);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filters-card .label {
+  margin-top: 6px;
+}
+
+.fine-print {
+  font-size: var(--text-caption);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-white);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip:has(input:checked) {
+  background: var(--color-sunburst);
+}
+
+.filters-card footer {
+  gap: 12px;
+}

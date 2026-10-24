@@ -32,6 +32,7 @@ A pair can have many matches, and can be connected on several topics (one row pe
 | # | Table | One row means | Lifetime |
 |---|---|---|---|
 | 1 | `users` | one person | permanent |
+| 1b | `user_filters` | who one person is willing to be matched with (age groups, countries, shared language) | permanent, edited in the Filters tab |
 | 2 | `curr_task` | what one person is doing now (`task_summary` + `topic`) | overwritten every push, deleted on quit |
 | 2b | `curr_task_history` | one past push (`task_summary` + `topic` + `pushed_at`) | permanent; for debugging and looking back at past work |
 | 3 | `matches` | Jev paired two people | permanent history |
