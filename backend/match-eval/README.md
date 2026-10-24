@@ -9,7 +9,11 @@ cd backend/match-eval
 ../.venv/bin/python run_eval.py                 # all variants (needs JEV_API)
 ../.venv/bin/python run_eval.py --variant current
 ../.venv/bin/python run_eval.py --offline       # word-overlap baseline, no key
+../.venv/bin/python run_eval.py --no-calls      # only cached answers, never calls Jev
 ```
+
+Jev answers are cached in `.jev_cache.json` (gitignored), keyed by the exact request, so
+re-runs only call Jev for new requests.
 
 `JEV_API` is read from the environment, then `backend/match-eval/.env`, then
 `backend/fastapi-sultan/.env`. The `current` variant runs Sultan's
@@ -22,6 +26,7 @@ Pairs with the same `a` go in one request, like production scoring several candi
 | `with-topic` | Each state line also carries the topic label |
 | `strict` | Criteria say the same label on a different subject, field or city is not a match |
 | `topic+strict` | Both |
+| `general` | Topic + criteria as general rules, with no subjects, places or jobs from the pair files (the fair version of `topic+strict`) |
 
 The pairs cover same activity with different specifics, related work across apps
 (writing Dijkstra code vs watching a shortest-path lecture), hard negatives (same
