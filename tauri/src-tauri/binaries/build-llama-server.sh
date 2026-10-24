@@ -19,7 +19,11 @@ cmake -S "$src" -B "$src/build" -DCMAKE_BUILD_TYPE=Release \
 cmake --build "$src/build" --config Release --target llama-server -j
 triple="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
 triple="${triple:-$(uname -m | sed 's/arm64/aarch64/')-apple-darwin}"
+# rm first: cp onto build.rs's empty placeholder would keep its non-executable
+# mode, and the app then can't start the sidecar (every summary falls back).
+rm -f "llama-server-$triple"
 cp "$src/build/bin/llama-server" "llama-server-$triple"
+chmod +x "llama-server-$triple"
 echo "built binaries/llama-server-$triple"
 # Should list only /usr/lib and /System libraries, no libllama or libggml.
 otool -L "llama-server-$triple"

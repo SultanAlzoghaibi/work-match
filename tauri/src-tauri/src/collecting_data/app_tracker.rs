@@ -31,6 +31,8 @@ const PRIVATE_APPS: [&str; 9] = [
 
 /// Our own app (both dev instances) isn't recorded at all.
 const OWN_BUNDLE_PREFIX: &str = "com.sultanalzoghaibi.workmatch";
+/// The dev build's process name (no bundle id outside a packaged .app).
+const OWN_DEV_BINARY: &str = "work_match";
 
 /// What's in front right now. Two polls with an equal Focus are the same session.
 #[derive(Clone, Debug, PartialEq)]
@@ -235,7 +237,7 @@ fn short_document(url: &str) -> Option<String> {
 
 #[cfg(target_os = "macos")]
 mod platform {
-    use super::{short_document, Focus, OWN_BUNDLE_PREFIX};
+    use super::{short_document, Focus, OWN_BUNDLE_PREFIX, OWN_DEV_BINARY};
     use accessibility_sys::{
         kAXDocumentAttribute, kAXErrorSuccess, kAXFocusedWindowAttribute, kAXTitleAttribute,
         kAXTrustedCheckOptionPrompt, AXIsProcessTrustedWithOptions, AXUIElementCopyAttributeValue,
@@ -263,7 +265,10 @@ mod platform {
 
     pub fn current_focus(app: &AppHandle) -> Option<Focus> {
         let (app_name, bundle_id, pid) = frontmost_app(app)?;
-        if bundle_id.as_deref().is_some_and(|bundle| bundle.starts_with(OWN_BUNDLE_PREFIX)) {
+        // Dev builds run the bare `work_match` binary, which has no bundle id.
+        let own_app = bundle_id.as_deref().is_some_and(|bundle| bundle.starts_with(OWN_BUNDLE_PREFIX))
+            || app_name == OWN_DEV_BINARY;
+        if own_app {
             return None;
         }
         let (window_title, document) = focused_window(pid);
