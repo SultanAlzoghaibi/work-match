@@ -8,7 +8,9 @@
     "build": "vite build",
     "tauri": "tauri",
     "dev1": "tauri dev",
-    "dev2": "CARGO_TARGET_DIR=$PWD/src-tauri/target-instance2 tauri dev --config src-tauri/tauri.conf.instance2.json"
+    "dev2": "CARGO_TARGET_DIR=$PWD/src-tauri/target-instance2 tauri dev --config src-tauri/tauri.conf.instance2.json",
+    "prod": "VITE_API_URL=https://work-match-api.vercel.app tauri dev",
+    "prod2": "VITE_API_URL=https://work-match-api.vercel.app CARGO_TARGET_DIR=$PWD/src-tauri/target-instance2 tauri dev --config src-tauri/tauri.conf.instance2.json"
   },
   "dependencies": {
     "@fontsource/bowlby-one": "^5",

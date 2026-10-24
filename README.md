@@ -79,7 +79,7 @@ Deployed (Vercel, same Supabase): `https://work-match-api.vercel.app`. To point 
 instead of a local FastAPI, start it with the URL:
 
 ```bash
-cd tauri && VITE_API_URL=https://work-match-api.vercel.app yarn dev1
+cd tauri && yarn prod     # instance 1 against the deployed API (prod2 for instance 2)
 ```
 
 See [backend/fastapi-sultan/README.md](backend/fastapi-sultan/README.md) (owned by Sultan: don't edit that folder). The profile Edit form saves to the local SQLite first, then `PATCH /users/{id}` on the FastAPI backend at `http://127.0.0.1:8000`.
