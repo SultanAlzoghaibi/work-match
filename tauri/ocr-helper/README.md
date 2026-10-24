@@ -12,6 +12,14 @@ The screenshot stays in memory and is never written to disk. Requires macOS 14+.
 ./build.sh          # -> bin/wm-ocr-<target-triple>, the name Tauri sidecars need
 ```
 
+## Test
+
+```sh
+./test.sh   # builds, then checks columns, secret redaction and errors on rendered test images
+```
+
+No Screen Recording permission is needed: the checks run on images, not your screen.
+
 ## Use
 
 ```sh

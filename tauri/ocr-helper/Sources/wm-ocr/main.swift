@@ -234,7 +234,8 @@ let secretPatterns: [(NSRegularExpression, String)] = [
     (#"\b([a-z][a-z0-9+.\-]*://)[^\s/@]+:[^\s/]+@"#, "$1[redacted]@"),
     // key = value / key: value for secret-looking keys
     (#"(?i)\b([\w.\-]*(?:password|passwd|pwd|secret|token|api[_\-]?key|access[_\-]?key|private[_\-]?key|auth)[\w.\-]*)(\s*[:=]\s*)\S+"#, "$1$2[redacted]"),
-    (#"-----BEGIN [A-Z ]*PRIVATE KEY-----"#, "[redacted private key]"),
+    // OCR reads the dashes unreliably (fewer of them, or as en/em dashes).
+    (#"(?i)[-–—_=\s]*BEGIN\s+[A-Z ]*PRIVATE\s+KEY[-–—_=\s]*"#, "[redacted private key]"),
     // Known token shapes
     (#"\bsk-[A-Za-z0-9_\-]{16,}"#, "[redacted]"),
     (#"\bsb_(?:secret|publishable)_[A-Za-z0-9_\-]{10,}"#, "[redacted]"),
