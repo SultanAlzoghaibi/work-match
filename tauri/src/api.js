@@ -3,7 +3,9 @@
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
 /// Hard-coded user until real sign-up exists. Seeded by backend/seed.sql.
-export const MOCK_USER_ID = "00000000-0000-0000-0000-000000000000";
+/// Instance 2 (yarn dev2) sets VITE_USER_ID to ...0001 so the two apps are
+/// two different people.
+export const MOCK_USER_ID = import.meta.env.VITE_USER_ID ?? "00000000-0000-0000-0000-000000000000";
 
 async function request(method, path, body) {
   const response = await fetch(`${API_URL}${path}`, {

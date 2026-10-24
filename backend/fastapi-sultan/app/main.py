@@ -14,7 +14,8 @@ app = FastAPI(title="work-match backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:1420",
+        "http://localhost:1420",  # instance 1 (yarn dev1)
+        "http://localhost:1421",  # instance 2 (yarn dev2)
         "tauri://localhost",
         "http://tauri.localhost",
     ],

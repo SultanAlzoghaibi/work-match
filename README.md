@@ -52,8 +52,22 @@ quit or pause ──────────────────────
 ```bash
 cd tauri
 yarn
-yarn tauri dev
+yarn dev1   # instance 1 (same as yarn tauri dev)
 ```
+
+### Two instances on one Mac (to test matching)
+
+Each instance is a separate person with its own port, local SQLite and backend user:
+
+| | Instance 1 | Instance 2 |
+|---|---|---|
+| Command | `yarn dev1` | `yarn dev2` |
+| Vite dev port | 1420 | 1421 |
+| Local SQLite | `~/Library/Application Support/com.sultanalzoghaibi.workmatch/work_match.db` | `~/Library/Application Support/com.sultanalzoghaibi.workmatch2/work_match.db` |
+| Backend user (`MOCK_USER_ID`) | `00000000-0000-0000-0000-000000000000` | `00000000-0000-0000-0000-000000000001` |
+| Rust build dir | `src-tauri/target` | `src-tauri/target-instance2` |
+
+Run them in two terminals. Instance 2's settings live in `src-tauri/tauri.conf.instance2.json`; its first build takes a few minutes because it compiles into its own folder. You'll see two globes in the menu bar. Both use the same FastAPI on port 8000, so seed both users with `backend/seed.sql` first.
 
 Left-click the smiling globe in the menu bar to open the app window. Closing the window keeps work-match running in the menu bar; right-click → Quit to exit.
 

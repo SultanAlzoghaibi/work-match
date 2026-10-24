@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "dev1": "tauri dev",
+    "dev2": "CARGO_TARGET_DIR=$PWD/src-tauri/target-instance2 tauri dev --config src-tauri/tauri.conf.instance2.json"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
