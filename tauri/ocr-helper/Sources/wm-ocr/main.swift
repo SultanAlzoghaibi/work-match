@@ -4,6 +4,7 @@
 //
 //   wm-ocr                         capture the frontmost window
 //   wm-ocr --image shot.png        OCR an image file instead (for testing)
+//   wm-ocr --app com.apple.TextEdit  capture that app's top window, even in the background
 //   wm-ocr --fast                  faster, less accurate recognition
 //   wm-ocr --no-correction         no language correction (better for code)
 //   wm-ocr --skip-bundle a,b       skip if the frontmost app is one of these
@@ -39,6 +40,7 @@ struct Result: Encodable {
     var app: String?
     var bundleId: String?
     var windowTitle: String?
+    var windowHeightPoints: Double?   // capture mode only; used to skip browser toolbars
     var source: String           // "window" | "image"
     var width: Int = 0
     var height: Int = 0
@@ -83,6 +85,7 @@ func fail(_ code: Int32, _ error: String, _ message: String) -> Never {
 
 struct Options {
     var imagePath: String?
+    var appBundle: String?
     var fast = false
     var correction = true
     var skipBundles: Set<String> = []
@@ -95,6 +98,9 @@ func parseOptions() -> Options {
     var args = CommandLine.arguments.dropFirst().makeIterator()
     while let arg = args.next() {
         switch arg {
+        case "--app":
+            guard let bundle = args.next() else { fail(1, "bad_args", "--app needs a bundle id") }
+            opts.appBundle = bundle
         case "--image":
             guard let path = args.next() else { fail(1, "bad_args", "--image needs a path") }
             opts.imagePath = path
@@ -111,7 +117,7 @@ func parseOptions() -> Options {
         case "--request-permission":
             opts.requestPermission = true
         case "-h", "--help":
-            print("usage: wm-ocr [--image PATH] [--fast] [--no-correction] [--skip-bundle a,b] [--max-lines N] [--request-permission]")
+            print("usage: wm-ocr [--image PATH] [--app BUNDLE_ID] [--fast] [--no-correction] [--skip-bundle a,b] [--max-lines N] [--request-permission]")
             exit(0)
         default:
             fail(1, "bad_args", "unknown argument \(arg)")
@@ -148,8 +154,10 @@ func captureFrontmostWindow(opts: Options, result: inout Result) async -> CGImag
         fail(2, "screen_recording_permission",
              "Grant Screen Recording in System Settings > Privacy & Security, then relaunch.")
     }
-    guard let front = NSWorkspace.shared.frontmostApplication else {
-        fail(3, "no_window", "No frontmost application")
+    let target = opts.appBundle.map { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }
+        ?? NSWorkspace.shared.frontmostApplication
+    guard let front = target else {
+        fail(3, "no_window", opts.appBundle.map { "\($0) is not running" } ?? "No frontmost application")
     }
     result.app = front.localizedName
     result.bundleId = front.bundleIdentifier
@@ -167,6 +175,7 @@ func captureFrontmostWindow(opts: Options, result: inout Result) async -> CGImag
             fail(3, "no_window", "\(front.localizedName ?? "App") has no visible window")
         }
         result.windowTitle = window.title
+        result.windowHeightPoints = window.frame.height
         if isSensitive(title: window.title) {
             result.skipped = true
             result.skipReason = "sensitive_window"
@@ -266,10 +275,21 @@ struct Column: Encodable {
     let text: String
 }
 
-/// Lines worth reading: drops low-confidence noise and the thin bands where
-/// title bars and status bars sit.
-func readable(_ lines: [Line]) -> [Line] {
-    lines.filter { $0.confidence >= 0.5 && $0.y > 0.03 && $0.y + $0.h < 0.97 }
+/// Browsers draw tabs, the address bar and bookmarks above the page. That text
+/// is noise for the summarizer (and can name private tabs), so it is dropped.
+let browserBundles: Set<String> = [
+    "com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser",
+    "com.brave.Browser", "com.microsoft.edgemac", "org.mozilla.firefox",
+]
+let browserToolbarPoints = 130.0
+
+/// Lines worth reading: drops low-confidence noise, the thin bands where
+/// title bars and status bars sit, and a browser's toolbar area.
+/// `toolbarFraction` is the share of the window height to skip at the top.
+func readable(_ lines: [Line], toolbarFraction: Double = 0) -> [Line] {
+    lines.filter {
+        $0.confidence >= 0.5 && $0.y > max(0.03, toolbarFraction) && $0.y + $0.h < 0.97
+    }
 }
 
 /// Splits the window into side-by-side columns (sidebar, editor, chat panel)
@@ -336,8 +356,14 @@ if let image {
             result.redactions += n
             return Line(text: text, confidence: line.confidence, x: line.x, y: line.y, w: line.w, h: line.h)
         }
-        result.lines = Array(lines.prefix(opts.maxLines))
-        result.columns = columns(from: readable(lines))
+        var toolbar = 0.0
+        if let bundle = result.bundleId, browserBundles.contains(bundle), let height = result.windowHeightPoints, height > 0 {
+            toolbar = browserToolbarPoints / height
+        }
+        // Toolbar text (tab titles, bookmarks) is left out of every output field.
+        let page = toolbar > 0 ? lines.filter { $0.y > toolbar } : lines
+        result.lines = Array(page.prefix(opts.maxLines))
+        result.columns = columns(from: readable(page, toolbarFraction: toolbar))
         result.mainText = mainText(from: result.columns)
     } catch {
         fail(4, "ocr_failed", error.localizedDescription)
