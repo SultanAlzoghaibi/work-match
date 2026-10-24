@@ -75,6 +75,13 @@ Left-click the smiling globe in the menu bar to open the app window. Closing the
 
 ## Run the backend
 
+Deployed (Vercel, same Supabase): `https://work-match-api.vercel.app`. To point the app at it
+instead of a local FastAPI, start it with the URL:
+
+```bash
+cd tauri && VITE_API_URL=https://work-match-api.vercel.app yarn dev1
+```
+
 See [backend/fastapi-sultan/README.md](backend/fastapi-sultan/README.md) (owned by Sultan: don't edit that folder). The profile Edit form saves to the local SQLite first, then `PATCH /users/{id}` on the FastAPI backend at `http://127.0.0.1:8000`.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design doc. Activity capture (Chrome

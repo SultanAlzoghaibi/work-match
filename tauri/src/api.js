@@ -1,6 +1,8 @@
 // work-match FastAPI backend (backend/fastapi-sultan/app/main.py).
 // Override with VITE_API_URL, e.g. VITE_API_URL=https://api.example.com yarn tauri dev
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
+// A trailing "/" is dropped: "…app/" + "/users" would hit "//users", which
+// Vercel redirects (308) and breaks POST / PATCH from the app.
+export const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 /// Hard-coded user until real sign-up exists. Seeded by backend/seed.sql.
 /// Instance 2 (yarn dev2) sets VITE_USER_ID to ...0001 so the two apps are
