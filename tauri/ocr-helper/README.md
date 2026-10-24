@@ -40,8 +40,14 @@ Output (one JSON object on stdout):
 ```
 
 - `lines`: every recognized line, with position as fractions of the image (top-left origin).
-- `main_text`: lines in reading order, without low-confidence noise or the title/status bar bands. Send this to the summarizer.
-- `skipped: true`: the frontmost app was on the `--skip-bundle` list; nothing was captured.
+- `columns`: side-by-side text areas (sidebar, editor, chat panel), largest first, each read top to bottom.
+- `main_text`: the columns joined in that order, without low-confidence noise or the title/status bar bands. Send this to the summarizer.
+- `skipped: true`: nothing was captured. `skip_reason` is `blocklist` (the app was in `--skip-bundle`) or `sensitive_window` (the title looks like `.env`, `credentials`, `id_rsa`, a `.pem` file, a keychain or a password manager).
+- `redactions`: how many secrets were replaced with `[redacted]`.
+
+## Secrets
+
+Before anything is printed, URL passwords (`postgresql://user:pw@...`), `password=` / `token:` / `api_key=` style values, private key headers, and known token shapes (OpenAI/OpenRouter `sk-`, Supabase `sb_secret_`, AWS `AKIA`, GitHub `ghp_`, Slack `xox`, Google `AIza`, JWTs, and long random strings) are replaced with `[redacted]`. Tested on an image of fake secrets: all replaced, normal code and URLs left alone.
 
 Errors print `{"error": "...", "message": "..."}` and exit non-zero:
 `1` bad arguments/image, `2` no Screen Recording permission, `3` no window, `4` capture/OCR failed.
