@@ -13,11 +13,11 @@ use tauri_nspanel::{
 
 #[cfg(target_os = "macos")]
 tauri_panel! {
-    // Match popup: floats in the corner over whatever you're doing. Clicks
-    // still reach its buttons, but it never takes keyboard focus.
+    // Match popup: floats in the corner over whatever you're doing and takes
+    // focus when it appears, so it can be answered right away.
     panel!(MatchPanel {
         config: {
-            can_become_key_window: false,
+            can_become_key_window: true,
             is_floating_panel: true,
         }
     })
@@ -63,13 +63,14 @@ pub fn hide_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 /// Match popup size in points; keep in sync with the "match" window in tauri.conf.json.
 #[cfg(target_os = "macos")]
-const MATCH_SIZE: NSSize = NSSize::new(340.0, 200.0);
+const MATCH_SIZE: NSSize = NSSize::new(340.0, 310.0);
 /// Gap between the menu bar / screen edge and the popup.
 #[cfg(target_os = "macos")]
 const EDGE_GAP: f64 = 8.0;
 
-/// Show the match popup in the top-right corner of the screen with the
-/// cursor, without activating the app or stealing focus from the user's work.
+/// Show the match popup in the top-right corner of the screen with the cursor
+/// and give it focus. The app is an Accessory and the panel is nonactivating,
+/// so activate the app first or the popup never really becomes key.
 #[cfg(target_os = "macos")]
 pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
     let app_for_main = app.clone();
@@ -88,7 +89,10 @@ pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
         panel
             .as_panel()
             .setFrame_display(NSRect::new(origin, MATCH_SIZE), true);
-        panel.show();
+        let ns_app = tauri_nspanel::objc2_app_kit::NSApplication::sharedApplication(main_thread);
+        #[allow(deprecated)]
+        ns_app.activateIgnoringOtherApps(true);
+        panel.show_and_make_key();
     });
 }
 
@@ -96,6 +100,7 @@ pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
 pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window(crate::MATCH_LABEL) {
         let _ = window.show();
+        let _ = window.set_focus();
     }
 }
 

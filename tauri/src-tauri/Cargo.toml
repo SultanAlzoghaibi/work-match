@@ -19,7 +19,27 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+# Stays on 0.31: it shares libsqlite3-sys 0.28 with tauri-plugin-sql's sqlx.
 rusqlite = { version = "0.31", features = ["bundled"] }
+tauri-plugin-shell = "2"
+# Opens the Jitsi call (match_popup.rs) in the default browser.
+tauri-plugin-opener = "2"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["net", "time", "sync"] }
+# Only talks to llama-server on 127.0.0.1, so no TLS backend. The backend push will need `rustls`.
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+regex = "1"
+url = "2"
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+getrandom = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+tower = { version = "0.5", features = ["util"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
+# collecting_data/app_tracker.rs: focused window title + document via Accessibility.
+accessibility-sys = "0.2"
+core-foundation = "0.10"

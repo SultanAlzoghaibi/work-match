@@ -5,10 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>work-match</title>
     <link rel="stylesheet" href="/src/style.css" />
+    <!-- Trial theme: theme-duo.css (Duolingo, navy) or theme-mercury.css (dark).
+         Delete this line for the sticker-book look. -->
+    <link rel="stylesheet" href="/src/theme-duo.css" />
   </head>
   <body>
     <!-- Overlay title bar: traffic lights sit on top; this strip drags the window. -->
-    <div class="titlebar" data-tauri-drag-region></div>
+    <header class="titlebar" data-tauri-drag-region>
+      <span id="titlebar-user" class="titlebar-user" data-tauri-drag-region></span>
+      <span class="titlebar-title" data-tauri-drag-region>work-match</span>
+      <span id="titlebar-status" class="titlebar-status" data-tauri-drag-region></span>
+    </header>
     <main id="root"></main>
     <script type="module" src="/src/main.js"></script>
   </body>

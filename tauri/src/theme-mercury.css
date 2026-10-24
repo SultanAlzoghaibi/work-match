@@ -1,0 +1,387 @@
+/* Mercury trial theme: dark onyx canvas, graphite cards, ivory text, one
+   cobalt action. Loaded after style.css and only overrides it, so removing
+   the <link> in index.html brings the sticker-book look back. */
+
+@import "@fontsource/inter/400.css";
+
+:root {
+  --color-onyx-canvas: #171721;
+  --color-graphite-card: #1e1e2a;
+  --color-obsidian-button: #272735;
+  --color-slate-border: #70707d;
+  --color-mist-border: #e2e3ed;
+  --color-ash-text: #c3c3cc;
+  --color-ivory-text: #ededf3;
+  --color-cobalt: #5266eb;
+  --color-pure-white: #ffffff;
+
+  --radius-cards: 12px;
+  --radius-buttons: 32px;
+  --hairline: 1px solid rgba(226, 227, 237, 0.12);
+
+  /* Inter stands in for both arcadia and arcadiaDisplay. */
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+
+  font-weight: 400;
+  font-size: 14px;
+  letter-spacing: 0.005em;
+  color: var(--color-ivory-text);
+}
+
+html,
+body {
+  background: var(--color-onyx-canvas);
+}
+
+::selection {
+  background: rgba(82, 102, 235, 0.45);
+}
+
+/* --- Title bar ------------------------------------------------------------- */
+
+.titlebar {
+  background: rgba(23, 23, 33, 0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: var(--hairline);
+}
+
+.titlebar-title {
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--color-ash-text);
+}
+
+.titlebar-user {
+  font-weight: 500;
+}
+
+.titlebar-status {
+  font-weight: 500;
+  border: var(--hairline);
+  background: var(--color-graphite-card);
+  color: var(--color-ash-text);
+}
+
+.titlebar-status.on {
+  background: var(--color-obsidian-button);
+  color: var(--color-ivory-text);
+  border-color: rgba(237, 237, 243, 0.4);
+}
+
+/* --- Type ------------------------------------------------------------------ */
+
+.display,
+.section-title,
+.edit h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+
+.section-title {
+  font-size: 21px;
+}
+
+.edit h2 {
+  font-size: 28px;
+}
+
+h2 {
+  font-weight: 500;
+  letter-spacing: 0.015em;
+  line-height: 1.2;
+}
+
+.muted,
+.fine,
+.value.empty,
+.dev-check-detail,
+.dev-time {
+  color: var(--color-ash-text);
+  opacity: 1;
+}
+
+.label,
+.field span {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--color-ash-text);
+}
+
+.friend-name,
+.friend-topic,
+.dev-check-label,
+.dev-totals,
+.dev-dur,
+.dev-app,
+.task-filters,
+.sync {
+  font-weight: 500;
+}
+
+/* --- Buttons: pills; cobalt only for the main action ----------------------- */
+
+button {
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.005em;
+  color: var(--color-ivory-text);
+  border: 1px solid transparent;
+  border-radius: var(--radius-buttons);
+  padding: 10px 20px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: none;
+}
+
+button.primary {
+  background: var(--color-cobalt);
+  color: var(--color-pure-white);
+}
+
+button.primary:hover:not(:disabled) {
+  background: #6074f0;
+}
+
+button.secondary {
+  background: transparent;
+  border-color: rgba(237, 237, 243, 0.35);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--color-obsidian-button);
+  border-color: var(--color-ivory-text);
+}
+
+button.link {
+  color: var(--color-ash-text);
+}
+
+button.link:hover:not(:disabled) {
+  color: var(--color-ivory-text);
+}
+
+button:disabled {
+  background: var(--color-obsidian-button);
+  color: var(--color-slate-border);
+}
+
+button.secondary.danger {
+  background: #3a1f28;
+  border-color: #b5485f;
+  color: var(--color-ivory-text);
+}
+
+/* Tabs read as nav pills: the selected one is a filled obsidian pill. */
+.tab.primary {
+  background: var(--color-obsidian-button);
+  color: var(--color-ivory-text);
+}
+
+.tab.secondary {
+  border-color: transparent;
+  color: var(--color-ash-text);
+}
+
+/* --- Surfaces: graphite cards, no outlines, no bright fills ---------------- */
+
+.details,
+.task-demo,
+.friends,
+.filters-card,
+.summary-card,
+.dev-section,
+.person-block,
+.error {
+  background: var(--color-graphite-card);
+  border: none;
+  border-radius: var(--radius-cards);
+  color: var(--color-ivory-text);
+}
+
+.task-demo,
+.friends,
+.filters-card,
+.summary-card {
+  padding: 24px;
+  gap: 12px;
+}
+
+.error {
+  box-shadow: inset 0 0 0 1px #b5485f;
+}
+
+.row + .row {
+  border-top: var(--hairline);
+}
+
+.row {
+  padding: 14px 20px;
+}
+
+.sync {
+  border: var(--hairline);
+}
+
+.sync.ok {
+  background: var(--color-graphite-card);
+}
+
+.sync.fail {
+  background: var(--color-graphite-card);
+  border-color: #b5485f;
+}
+
+.person-match,
+.topic-pill,
+.chip {
+  background: var(--color-obsidian-button);
+  border: none;
+  color: var(--color-ivory-text);
+  font-weight: 500;
+}
+
+.chip:has(input:checked) {
+  background: var(--color-ivory-text);
+  color: var(--color-onyx-canvas);
+}
+
+.friend {
+  border: none;
+  border-radius: var(--radius-cards);
+  background: var(--color-obsidian-button);
+}
+
+.friend.online {
+  background: var(--color-obsidian-button);
+  box-shadow: inset 3px 0 0 var(--color-ivory-text);
+}
+
+.friend.offline {
+  background: transparent;
+  opacity: 0.6;
+}
+
+.dev-row,
+.dev-capture,
+.dev-capture > summary {
+  border-top-color: rgba(226, 227, 237, 0.08);
+}
+
+.dev-pre {
+  background: var(--color-onyx-canvas);
+}
+
+.dev-check .dot {
+  border: none;
+}
+
+.dev-check.ok .dot { background: var(--color-ivory-text); }
+.dev-check.warn .dot { background: var(--color-slate-border); }
+.dev-check.bad .dot { background: #b5485f; }
+
+/* --- Avatars and stickers -------------------------------------------------- */
+
+.avatar {
+  border: none;
+  background: var(--color-obsidian-button);
+  color: var(--color-ivory-text);
+  font-weight: 500;
+}
+
+/* Monochrome system: the colored stickers don't belong. */
+.sticker {
+  display: none;
+}
+
+.who {
+  padding-right: 0;
+}
+
+/* --- Inputs ---------------------------------------------------------------- */
+
+input,
+select {
+  color: var(--color-ivory-text);
+  background: transparent;
+  border: 1px solid rgba(226, 227, 237, 0.3);
+  border-radius: 32px;
+  padding: 11px 20px;
+}
+
+select {
+  background: var(--color-graphite-card);
+}
+
+input::placeholder {
+  color: var(--color-ash-text);
+  opacity: 0.7;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-ivory-text);
+}
+
+input[type="checkbox"] {
+  border-radius: 6px;
+  padding: 0;
+  border-color: rgba(226, 227, 237, 0.45);
+}
+
+input[type="checkbox"]:checked {
+  background: var(--color-ivory-text);
+  border-color: var(--color-ivory-text);
+}
+
+input[type="checkbox"]:checked::after {
+  border-color: var(--color-onyx-canvas);
+}
+
+.inline-input {
+  background: var(--color-obsidian-button);
+  border: 1px solid var(--color-ivory-text);
+  color: var(--color-ivory-text);
+}
+
+.editable:hover,
+.row.editable .value:hover {
+  background: rgba(237, 237, 243, 0.06);
+}
+
+/* --- Login: a quiet hero ---------------------------------------------------- */
+
+.login {
+  gap: 20px;
+}
+
+.login .display {
+  font-size: 49px;
+  line-height: 1.1;
+}
+
+.login .tagline {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--color-ash-text);
+  max-width: 380px;
+}
+
+.login .auth {
+  width: 300px;
+  gap: 12px;
+}
+
+.login .skip {
+  width: 300px;
+}

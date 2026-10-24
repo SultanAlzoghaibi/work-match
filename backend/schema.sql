@@ -14,18 +14,39 @@
 --   match popup expires : 2 min
 --   active row expires  : 11 min without a push (about 2 missed pushes = app gone)
 
+-- Profile pictures live in Supabase Storage, not in a table. One-time setup in the
+-- dashboard: Storage -> New bucket "avatars", public, 2 MB limit, image/jpeg,
+-- image/png, image/webp. The backend uploads {user_id}.jpg with the service-role key.
+-- Existing DB: alter table users add column avatar_url text;
+--              alter table users add column career text;
+
 -- 1. Who someone is. Permanent.
 create table users (
     id              uuid        primary key default gen_random_uuid(),   -- the app may also pick it
     token           text        not null unique,                 -- TODO: store a hash
+    username        text        unique,                          -- lowercase; sign-in name
+    password_hash   text,                                        -- scrypt$salt$hash
     name            text        not null,
     school          text,
+    career          text,                                        -- e.g. 'Software engineer', 'CS student'
     bio             text,                                        -- shown in match popup
     discord_handle  text,                                        -- used to start the call
+    avatar_url      text,                                        -- public URL in Storage bucket 'avatars'; null = show initial
     age_group       text        check (age_group in ('under_18','18_24','25_34','35_44','45_plus')),
     country         char(2),                                     -- ISO code, e.g. 'CA'
+    languages       text[]      not null default '{}',           -- e.g. {English,Arabic}; used by filters
     sharing_enabled boolean     not null default false,
     created_at      timestamptz not null default now()
+);
+
+-- 1b. Who each person is willing to be matched with. One row per user; no row =
+--     no filters. Matching is mutual: both people's filters must allow the pair.
+create table user_filters (
+    user_id         uuid        primary key references users(id) on delete cascade,
+    age_groups      text[]      not null default '{}',           -- allowed age groups; empty = any
+    countries       char(2)[]   not null default '{}',           -- allowed countries (ISO); empty = anywhere
+    shared_language boolean     not null default false,          -- only people who share a language with me
+    updated_at      timestamptz not null default now()
 );
 
 -- 2. What each person is doing right now. One row per user, overwritten every push,
@@ -36,6 +57,18 @@ create table curr_task (
     topic        text,                                           -- short label, e.g. 'LeetCode'
     pushed_at    timestamptz not null default now()
 );
+
+-- 2b. Every push, kept as history (curr_task only holds the latest one). For
+--     debugging and for looking back at past work. Never deleted by quit/pause.
+create table curr_task_history (
+    id           bigint generated always as identity primary key,
+    user_id      uuid        not null references users(id) on delete cascade,
+    task_summary text        not null,
+    topic        text,
+    pushed_at    timestamptz not null default now()
+);
+
+create index idx_curr_task_history_user on curr_task_history (user_id, pushed_at desc);
 
 -- 3. Jev paired two people. A new row = match occurred (created once, starts pending).
 --    Each side answers the popup separately.
@@ -48,6 +81,9 @@ create table matches (
     a_status   text        not null default 'pending' check (a_status in ('pending','accepted','declined')),
     b_status   text        not null default 'pending' check (b_status in ('pending','accepted','declined')),
     created_at timestamptz not null default now(),               -- popup expires after 2 min
+    room_id    text,                                             -- Jitsi room name, set when both accept; the apps join it
+    a_keep     boolean,                                          -- "keep in touch?" after both accept;
+    b_keep     boolean,                                          --   NULL until answered, both true -> connection
     check (user_a < user_b)                                      -- store each pair one way
 );
 
@@ -86,7 +122,9 @@ create table is_working_on_connections (
 -- Only the backend (service role) touches these tables. RLS on with no policies
 -- blocks direct reads from the app's anon key.
 alter table users                     enable row level security;
+alter table user_filters              enable row level security;
 alter table curr_task                 enable row level security;
+alter table curr_task_history         enable row level security;
 alter table matches                   enable row level security;
 alter table connections               enable row level security;
 alter table is_working_on_connections enable row level security;
@@ -131,6 +169,7 @@ $$;
 -- insert into curr_task (user_id, task_summary, topic) values (:me, :summary, :topic)
 -- on conflict (user_id) do update set
 --     task_summary = excluded.task_summary, topic = excluded.topic, pushed_at = now();
+-- insert into curr_task_history (user_id, task_summary, topic) values (:me, :summary, :topic);
 -- delete from is_working_on_connections where user_id = :me;
 -- insert into is_working_on_connections (connection_id, user_id)
 --     select id, :me from connections where :me in (user_a, user_b) and topic = :topic;
