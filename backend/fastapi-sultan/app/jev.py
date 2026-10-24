@@ -42,8 +42,9 @@ def score_candidates(my_summary: str, candidates: list[dict], my_topic: str | No
         questions[f"c{index}"] = {
             "type": "noul",
             # Criteria, topic labels and MATCH_THRESHOLD=0.45 were measured
-            # together in backend/match-eval ("general"): 96% of 84 labelled
-            # pairs right. Change them together and re-run the eval.
+            # together in backend/match-eval ("general-agnostic"): 96% of 105
+            # labelled pairs right, 100% on different city / event / company.
+            # Change them together and re-run the eval.
             "instructions": (
                 f"Are Me and Person {index} doing the same kind of activity, so that "
                 "working side by side would help them both?"
@@ -58,7 +59,9 @@ def score_candidates(my_summary: str, candidates: list[dict], my_topic: str | No
                 ),
                 "false": (
                     "Their activities are different, or they only share a broad category of "
-                    "activity while the specific subject, field, goal or place is different."
+                    "activity while the specific subject, field or goal is different. Being in "
+                    "a different city, at a different event or at a different company doesn't "
+                    "matter."
                 ),
             },
         }

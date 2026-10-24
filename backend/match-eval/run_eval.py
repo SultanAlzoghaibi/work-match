@@ -247,9 +247,13 @@ def ask_two(key: str, me: dict, others: list[dict], sultan) -> list[tuple[float,
 
 
 def score_current(sultan, me: dict, others: list[dict]) -> list[float]:
-    """Production code path, unchanged."""
-    candidates = [{"user_id": i, "task_summary": o["task_summary"]} for i, o in enumerate(others)]
-    scores = sultan.score_candidates(me["task_summary"], candidates)
+    """Production code path, unchanged, called the way matching.py calls it
+    (with both people's topic labels)."""
+    candidates = [
+        {"user_id": i, "topic": o.get("topic"), "task_summary": o["task_summary"]}
+        for i, o in enumerate(others)
+    ]
+    scores = sultan.score_candidates(me["task_summary"], candidates, my_topic=me.get("topic"))
     return [scores[i] for i in range(len(others))]
 
 
