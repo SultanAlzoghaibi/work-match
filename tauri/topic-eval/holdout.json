@@ -1,0 +1,493 @@
+{
+ "cases": [
+  {
+   "name": "spanish-practice",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Duolingo - Spanish",
+     "minutes": 6
+    },
+    {
+     "app": "Anki",
+     "title": "Spanish verbs",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.duolingo.com",
+     "path": "/learn",
+     "title": "Duolingo - Spanish",
+     "text": "Lesson 4: preterite tense. Translate: Ayer comí en un restaurante."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Studying",
+    "Language learning",
+    "Spanish"
+   ],
+   "bad_words": [
+    "anki",
+    "chrome",
+    "claude",
+    "docker",
+    "duolingo",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "unity-game",
+   "apps": [
+    {
+     "app": "Unity",
+     "title": "Platformer - SampleScene",
+     "minutes": 7
+    },
+    {
+     "app": "Code",
+     "title": "PlayerController.cs — Platformer",
+     "minutes": 4
+    }
+   ],
+   "pages": [
+    {
+     "host": "docs.unity3d.com",
+     "path": "/ScriptReference/Rigidbody2D.AddForce.html",
+     "title": "Rigidbody2D.AddForce - Unity Scripting API",
+     "text": "Apply a force to the rigidbody. The force is specified as two separate components in the X and Y directions."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Game development",
+    "App development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "unity",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "physics-lab-report",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Physics 7B Lab 3 - Overleaf",
+     "minutes": 8
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.overleaf.com",
+     "path": "/project/xyz",
+     "title": "Physics 7B Lab 3 - Overleaf",
+     "text": "\\section{Results} The measured period of the pendulum was 2.01 s, consistent with T = 2 pi sqrt(L/g)."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Writing",
+    "Coursework",
+    "Physics 7B",
+    "Physics"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "overleaf",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "club-poster",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Hackathon poster - Canva",
+     "minutes": 6
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.canva.com",
+     "path": "/design/abc/edit",
+     "title": "Hackathon poster - Canva",
+     "text": "Join us for Code Night! Free pizza. Thursday 7pm. Add text. Elements. Uploads."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Design",
+    "Graphic design",
+    "Poster design"
+   ],
+   "bad_words": [
+    "canva",
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "resume-and-linkedin",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Resume - Google Docs",
+     "minutes": 5
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Data Analyst jobs | LinkedIn",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "docs.google.com",
+     "path": "/document/d/9/edit",
+     "title": "Resume - Google Docs",
+     "text": "Experience: Data Analyst Intern. Built dashboards in Tableau. Skills: SQL, Python, Excel."
+    },
+    {
+     "host": "www.linkedin.com",
+     "path": "/jobs/search",
+     "title": "Data Analyst jobs | LinkedIn",
+     "text": "Data Analyst - Entry level. Easy Apply. 120 applicants."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Job hunting"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "google docs",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "linkedin",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "kaggle-sklearn",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Titanic notebook | Kaggle",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "RandomForestClassifier — scikit-learn",
+     "minutes": 2
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.kaggle.com",
+     "path": "/code/me/titanic",
+     "title": "Titanic notebook | Kaggle",
+     "text": "Feature engineering: fill missing Age with median, one-hot encode Embarked. Accuracy 0.81."
+    },
+    {
+     "host": "scikit-learn.org",
+     "path": "/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html",
+     "title": "RandomForestClassifier — scikit-learn",
+     "text": "A random forest classifier."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Data science",
+    "Machine learning"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "kaggle",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "scikit",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "nextjs-with-npm",
+   "apps": [
+    {
+     "app": "Terminal",
+     "title": "npm run build — shop — zsh",
+     "minutes": 2
+    },
+    {
+     "app": "Code",
+     "title": "page.tsx — shop",
+     "minutes": 6
+    }
+   ],
+   "pages": [
+    {
+     "host": "nextjs.org",
+     "path": "/docs/app/building-your-application/routing",
+     "title": "Routing: Fundamentals | Next.js",
+     "text": "The App Router works in a new directory named app. Each folder represents a route segment."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Web development",
+    "Frontend development",
+    "Coding",
+    "Software development",
+    "Programming"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "next.js",
+    "nextjs",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "austin-apartments",
+   "apps": [
+    {
+     "app": "Google Chrome",
+     "title": "Austin TX Apartments for Rent | Zillow",
+     "minutes": 7
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.zillow.com",
+     "path": "/austin-tx/rentals/",
+     "title": "Austin TX Apartments for Rent | Zillow",
+     "text": "2 bd 1 ba, East Austin, pets allowed, in-unit laundry."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "Apartment hunting"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn",
+    "zillow"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "cs70-homework",
+   "apps": [
+    {
+     "app": "Preview",
+     "title": "CS70 HW5.pdf",
+     "minutes": 6
+    },
+    {
+     "app": "Google Chrome",
+     "title": "Note 12: Probability | CS 70",
+     "minutes": 3
+    }
+   ],
+   "pages": [
+    {
+     "host": "www.eecs70.org",
+     "path": "/assets/pdf/notes/n12.pdf",
+     "title": "Note 12: Probability | CS 70",
+     "text": "Probability spaces, events, conditional probability, Bayes rule."
+    }
+   ],
+   "shareable": true,
+   "good_topics": [
+    "CS 70",
+    "Coursework"
+   ],
+   "bad_words": [
+    "chrome",
+    "claude",
+    "docker",
+    "git",
+    "github",
+    "intellij",
+    "iterm",
+    "jupyter",
+    "notion",
+    "npm",
+    "pip",
+    "pnpm",
+    "preview",
+    "rustrover",
+    "terminal",
+    "vs code",
+    "vscode",
+    "xcode",
+    "yarn"
+   ],
+   "unsure": false,
+   "from": "holdout"
+  },
+  {
+   "name": "only-chat-apps",
+   "apps": [
+    {
+     "app": "WhatsApp",
+     "title": "Family",
+     "minutes": 4
+    },
+    {
+     "app": "Messages",
+     "title": "Alex",
+     "minutes": 2
+    }
+   ],
+   "pages": [],
+   "shareable": false,
+   "good_topics": [],
+   "bad_words": [],
+   "unsure": false,
+   "from": "holdout"
+  }
+ ]
+}

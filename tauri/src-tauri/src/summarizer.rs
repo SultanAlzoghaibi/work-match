@@ -502,6 +502,10 @@ pub fn get_last_summary(buffer: State<'_, Buffer>) -> Result<Option<ActivitySumm
 }
 
 #[cfg(test)]
+#[path = "topic_eval.rs"]
+mod topic_eval;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
