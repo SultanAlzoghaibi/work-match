@@ -1,5 +1,6 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
   color: #fff;
 }
 
@@ -15,10 +16,9 @@ body {
 #root {
   height: 100%;
   box-sizing: border-box;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   border-radius: 26px;
 }
 
@@ -28,13 +28,201 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-h1 {
+section,
+form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+h1,
+h2,
+p {
   margin: 0;
-  font-size: 32px;
+}
+
+h1 {
+  font-size: 26px;
   font-weight: 600;
 }
 
-p {
-  margin: 8px 0 0;
-  opacity: 0.75;
+h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.muted {
+  opacity: 0.7;
+}
+
+.fine {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.error {
+  color: #ffb4b4;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 600;
+}
+
+button.primary:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+button.link {
+  background: none;
+  padding: 8px 4px;
+  opacity: 0.7;
+}
+
+button.link:hover {
+  opacity: 1;
+}
+
+footer {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Login */
+.login {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.login .logo {
+  font-size: 56px;
+}
+
+.login button.primary {
+  margin-top: 14px;
+  width: 200px;
+  padding: 10px;
+}
+
+/* Profile view */
+.profile header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.who {
+  min-width: 0;
+}
+
+.who p {
+  margin-top: 3px;
+}
+
+.details {
+  margin-top: 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.row + .row {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.label {
+  opacity: 0.6;
+}
+
+.value {
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value.empty {
+  opacity: 0.4;
+}
+
+/* Edit form */
+.edit {
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field span {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  user-select: text;
+}
+
+input:focus,
+select:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+select option {
+  color: #000;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
 }

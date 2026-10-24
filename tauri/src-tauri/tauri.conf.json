@@ -15,8 +15,8 @@
       {
         "label": "main",
         "title": "work-match",
-        "width": 420,
-        "height": 220,
+        "width": 360,
+        "height": 440,
         "transparent": true,
         "decorations": false,
         "shadow": false,

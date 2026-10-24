@@ -62,7 +62,7 @@ pub fn open_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
 
 /// Full panel size in points; keep in sync with tauri.conf.json width/height.
 #[cfg(target_os = "macos")]
-const PANEL_SIZE: NSSize = NSSize::new(420.0, 220.0);
+const PANEL_SIZE: NSSize = NSSize::new(360.0, 440.0);
 /// Size the panel starts at before it grows out of the tray icon.
 #[cfg(target_os = "macos")]
 const START_SIZE: NSSize = NSSize::new(60.0, 30.0);

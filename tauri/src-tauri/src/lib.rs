@@ -20,12 +20,20 @@ fn os_name() -> &'static str {
 
 pub fn run() {
     // Migrations run once each, in order, when the DB is first loaded.
-    let migrations = vec![Migration {
-        version: 1,
-        description: "init_local",
-        sql: include_str!("migrations/001_init_local.sql"),
-        kind: MigrationKind::Up,
-    }];
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "init_local",
+            sql: include_str!("migrations/001_init_local.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "profile_fields",
+            sql: include_str!("migrations/002_profile_fields.sql"),
+            kind: MigrationKind::Up,
+        },
+    ];
 
     let builder = tauri::Builder::default().plugin(
         tauri_plugin_sql::Builder::default()
