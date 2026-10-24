@@ -41,6 +41,26 @@ always empty.
   "source": "llama", "window_minutes": 5, "created_at": 1761300300000 }
 ```
 
+## Screen text (non-browser apps)
+
+`src-tauri/src/collecting_data/screen_capture.rs` adds a second source next to the
+extension. Every 30 s (10 s with `DEMO_MODE=1`) while sharing is on, it runs the `wm-ocr`
+sidecar (`tauri/ocr-helper`) on the front window and stores the text in `captures` with
+`source = 'screen'`, `host` = the app name and `path` / `title` = the window title.
+
+- **Skipped:** messaging, mail, calls, password managers, System Settings and this app
+  (by bundle id, before any screenshot), and **Chrome while the extension has sent a page
+  in the last 2 minutes**, since the extension reads the page itself.
+- **On the way in:** wm-ocr keeps the screenshot in memory only, never captures windows
+  titled like `.env` / `credentials` / `id_rsa`, replaces passwords, keys and tokens with
+  `[redacted]`, and drops browser toolbars. The text is then scrubbed like page text and
+  cut to 2000 characters.
+- **In the prompt:** screen text gets its own section after the pages, labelled as
+  possibly including menus and stray words. The summarizer's private-app filter also
+  drops screen text from private apps and from windows whose titles name a private site.
+- Needs the **Screen Recording** permission (asked once). Without it, the app logs that
+  and carries on with Chrome pages only.
+
 ## What leaves the laptop
 
 Only `{ "task_summary": "...", "topic": "..." }`, and only for shareable summaries
