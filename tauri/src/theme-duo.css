@@ -1,0 +1,403 @@
+/* Duolingo-style trial theme with Meta's blue (a subtle #0081fb -> #0064e0
+   gradient) as the accent: white paper, chunky
+   12px-radius controls with 2px borders and a pressable bottom edge, mid-gray
+   body text, navy for headings and the main action. Loaded after style.css
+   and only overrides it; swap the <link> in index.html to change themes. */
+
+@import "@fontsource/inter/800.css";
+
+:root {
+  /* "navy" tokens now hold Meta blue; names kept so the rules below read the same. */
+  --color-navy: #0064e0;
+  --color-navy-deep: #0050b8;
+  --color-navy-wash: #e7f1ff;
+  --meta-gradient: linear-gradient(135deg, #0081fb 0%, #0064e0 100%);
+  --color-spark-blue: #0081fb; /* links and outlined buttons: the light end of the Meta gradient */
+  --color-paper-white: #ffffff;
+  --color-charcoal: #4b4b4b;
+  --color-pencil-gray: #777777;
+  --color-faded-gray: #afafaf;
+  --color-swan: #e5e5e5;
+
+  --radius-duo: 12px;
+  --radius-card-duo: 16px;
+  --edge: 2px solid var(--color-swan);
+
+  /* Inter 800 stands in for feather, Inter 500/700 for duolingo-sans. */
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: var(--color-charcoal);
+}
+
+html,
+body {
+  background: var(--color-paper-white);
+}
+
+/* --- Title bar ------------------------------------------------------------- */
+
+.titlebar {
+  background: var(--color-paper-white);
+  border-bottom: var(--edge);
+}
+
+.titlebar-title {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: var(--color-navy);
+}
+
+.titlebar-user {
+  font-weight: 700;
+  color: var(--color-charcoal);
+}
+
+.titlebar-status {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.053em;
+  border: var(--edge);
+  border-radius: var(--radius-duo);
+  background: var(--color-paper-white);
+  color: var(--color-faded-gray);
+}
+
+.titlebar-status.on {
+  background: var(--color-navy-wash);
+  border-color: var(--color-navy);
+  color: var(--color-navy);
+}
+
+/* --- Type ------------------------------------------------------------------ */
+
+.display,
+.section-title,
+.edit h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--color-navy);
+  background: var(--meta-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.section-title {
+  font-size: 22px;
+}
+
+.edit h2 {
+  font-size: 32px;
+}
+
+h2 {
+  font-weight: 700;
+  color: var(--color-charcoal);
+}
+
+.muted,
+.fine,
+.value.empty,
+.dev-check-detail,
+.dev-time {
+  color: var(--color-pencil-gray);
+  opacity: 1;
+}
+
+.label,
+.field span {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.053em;
+  color: var(--color-faded-gray);
+}
+
+/* --- Buttons: chunky, pressable -------------------------------------------- */
+
+button {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.053em;
+  color: var(--color-spark-blue);
+  background: var(--color-paper-white);
+  border: var(--edge);
+  border-bottom-width: 4px;
+  border-radius: var(--radius-duo);
+  padding: 10px 16px 8px;
+  transition: filter 0.1s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: none;
+  filter: brightness(0.97);
+}
+
+button:active:not(:disabled) {
+  border-bottom-width: 2px;
+  transform: translateY(2px);
+}
+
+button.primary {
+  background: var(--meta-gradient);
+  color: var(--color-paper-white);
+  border-color: var(--color-navy-deep);
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+button.secondary {
+  background: var(--color-paper-white);
+  color: var(--color-spark-blue);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #f7f7f7;
+}
+
+button.link {
+  border: none;
+  background: none;
+  color: var(--color-spark-blue);
+  padding: 10px 6px;
+}
+
+button.link:active:not(:disabled) {
+  transform: none;
+}
+
+button:disabled {
+  background: var(--color-swan);
+  color: var(--color-faded-gray);
+  border-color: var(--color-swan);
+}
+
+button.secondary.danger {
+  background: #ff4b4b;
+  border-color: #ea2b2b;
+  color: var(--color-paper-white);
+}
+
+/* Tabs: selected one is a navy-tinted pill, the rest are quiet gray. */
+.tab.primary {
+  background: var(--color-navy-wash);
+  color: var(--color-navy);
+  border-color: var(--color-navy);
+}
+
+.tab.secondary {
+  color: var(--color-faded-gray);
+  border-color: transparent;
+  background: transparent;
+}
+
+/* --- Surfaces: white cards with 2px gray edges ----------------------------- */
+
+.details,
+.task-demo,
+.friends,
+.filters-card,
+.summary-card,
+.dev-section,
+.person-block {
+  background: var(--color-paper-white);
+  border: var(--edge);
+  border-radius: var(--radius-card-duo);
+  color: var(--color-charcoal);
+}
+
+.task-demo,
+.friends,
+.filters-card,
+.summary-card {
+  padding: 20px;
+}
+
+.error {
+  background: #ffdfe0;
+  border: 2px solid #ff4b4b;
+  border-radius: var(--radius-duo);
+  color: #ea2b2b;
+  font-weight: 700;
+}
+
+.row + .row {
+  border-top: var(--edge);
+}
+
+.row {
+  padding: 12px 18px;
+}
+
+.sync {
+  border: var(--edge);
+  border-radius: var(--radius-duo);
+}
+
+.sync.ok {
+  background: var(--color-navy-wash);
+  border-color: var(--color-navy);
+  color: var(--color-navy);
+}
+
+.sync.fail {
+  background: #ffdfe0;
+  border-color: #ff4b4b;
+}
+
+.person-match,
+.topic-pill {
+  background: var(--color-navy-wash);
+  border: 2px solid var(--color-navy);
+  border-radius: var(--radius-duo);
+  color: var(--color-navy);
+  font-weight: 700;
+}
+
+.chip {
+  border: var(--edge);
+  border-radius: var(--radius-duo);
+  background: var(--color-paper-white);
+  color: var(--color-pencil-gray);
+}
+
+.chip:has(input:checked) {
+  background: var(--color-navy-wash);
+  border-color: var(--color-navy);
+  color: var(--color-navy);
+}
+
+.friend {
+  border: var(--edge);
+  border-radius: var(--radius-card-duo);
+  background: var(--color-paper-white);
+}
+
+.friend.online {
+  background: var(--color-navy-wash);
+  border-color: var(--color-navy);
+}
+
+.friend.offline {
+  background: #f7f7f7;
+  opacity: 0.8;
+}
+
+.dev-row,
+.dev-capture,
+.dev-capture > summary {
+  border-top-color: var(--color-swan);
+}
+
+.dev-pre {
+  background: #f7f7f7;
+}
+
+.dev-check .dot {
+  border: none;
+}
+
+.dev-check.ok .dot { background: var(--color-navy); }
+.dev-check.warn .dot { background: #ffc800; }
+.dev-check.bad .dot { background: #ff4b4b; }
+
+/* --- Avatars and stickers -------------------------------------------------- */
+
+.avatar {
+  border: 2px solid var(--color-navy);
+  background: var(--color-navy-wash);
+  color: var(--color-navy);
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+/* Stickers stay as the "mascot art": same shapes, Duolingo's flat edges. */
+.sticker {
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  border-bottom-width: 4px;
+  border-radius: var(--radius-card-duo);
+}
+
+/* --- Inputs ---------------------------------------------------------------- */
+
+input,
+select {
+  color: var(--color-charcoal);
+  background: #f7f7f7;
+  border: var(--edge);
+  border-radius: var(--radius-duo);
+  padding: 11px 16px;
+  font-weight: 500;
+}
+
+input::placeholder {
+  color: var(--color-faded-gray);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-spark-blue);
+  background: var(--color-paper-white);
+}
+
+input[type="checkbox"] {
+  border: var(--edge);
+  border-radius: 6px;
+  background: var(--color-paper-white);
+  padding: 0;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--meta-gradient);
+  border-color: var(--color-navy);
+}
+
+.inline-input {
+  border: 2px solid var(--color-spark-blue);
+  background: var(--color-paper-white);
+}
+
+.editable:hover,
+.row.editable .value:hover {
+  background: var(--color-navy-wash);
+}
+
+/* --- Login ----------------------------------------------------------------- */
+
+.login {
+  gap: 18px;
+}
+
+.login .display {
+  font-size: 56px;
+  line-height: 1;
+}
+
+.login .tagline {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-pencil-gray);
+  max-width: 360px;
+}
+
+.login .auth {
+  width: 300px;
+  gap: 12px;
+}
+
+.login .skip {
+  width: 300px;
+}
