@@ -7,6 +7,8 @@ above MATCH_THRESHOLD.
 import os
 from uuid import UUID
 
+from psycopg.types.json import Json
+
 from . import jev
 
 
@@ -86,7 +88,17 @@ def clear_expired_pending(conn, user_1: UUID, user_2: UUID) -> None:
 
 
 def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
-    """Run the search for `me` right after their push. Returns a MatchResult dict."""
+    """Run the search for `me` right after their push. Returns a MatchResult dict.
+
+    Every search is logged to jev_runs / jev_comparisons (see _log_run).
+    """
+    log = {"outcome": None, "candidates": [], "decisions": {}, "trace": {}}
+    result = _find_match(conn, me, my_summary, topic, filters, log)
+    _log_run(conn, me, my_summary, topic, result, log)
+    return result
+
+
+def _find_match(conn, me: UUID, my_summary: str, topic: str, filters, log: dict) -> dict:
     result = {"match_id": None, "other_name": None, "scores": [], "skipped_reason": None}
 
     profile = conn.execute(
@@ -94,6 +106,7 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
     ).fetchone()
     if profile is None or not profile["sharing_enabled"]:
         result["skipped_reason"] = "sharing is off"
+        log["outcome"] = "sharing_off"
         return result
 
     candidates = conn.execute(
@@ -110,17 +123,20 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
             "limit": jev.MAX_CANDIDATES,
         },
     ).fetchall()
+    log["candidates"] = candidates
     if not candidates:
         result["skipped_reason"] = (
             "no one available: nobody else is sharing a task that fits your filters, "
             "or you were matched with them recently"
         )
+        log["outcome"] = "no_candidates"
         return result
 
     try:
-        scores = jev.score_candidates(my_summary, candidates, my_topic=topic)
+        scores = jev.score_candidates(my_summary, candidates, my_topic=topic, trace=log["trace"])
     except jev.JevError as err:
         result["skipped_reason"] = str(err)
+        log["outcome"] = "jev_error"
         return result
 
     names = {candidate["user_id"]: candidate["name"] for candidate in candidates}
@@ -129,12 +145,15 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
         {"user_id": user_id, "name": names[user_id], "score": round(score, 3)}
         for user_id, score in ranked
     ]
+    log["scores"] = scores
+    log["outcome"] = "below_threshold"
 
     # create_match() returns null if either person already has a pending popup
     # or a concurrent push made the same pair, so try the next best.
     for user_id, score in ranked:
         if score < _threshold():
             break
+        log["outcome"] = "all_busy"
         clear_expired_pending(conn, me, user_id)
         row = conn.execute(
             "select create_match(%s, %s, %s, %s::real) as id", (me, user_id, topic, score)
@@ -143,8 +162,76 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
         if row["id"] is not None:
             result["match_id"] = row["id"]
             result["other_name"] = names[user_id]
+            log["decisions"][user_id] = "matched"
+            log["outcome"] = "matched"
             break
+        log["decisions"][user_id] = "busy"
+    if log["outcome"] == "all_busy":
+        # Scored high enough, but create_match() refused: you or they already
+        # have a match popup open (or one from the last 2 minutes).
+        busy = ", ".join(names[user_id] for user_id, decision in log["decisions"].items() if decision == "busy")
+        result["skipped_reason"] = (
+            f"good match with {busy}, but one of you already has a match popup open; it retries on the next push"
+        )
     return result
+
+
+def _log_run(conn, me: UUID, my_summary: str, topic: str, result: dict, log: dict) -> None:
+    """Write one jev_runs row plus a jev_comparisons row per candidate.
+
+    Runs in a savepoint and swallows errors: a broken log must never cost a
+    match (the match itself is already committed).
+    """
+    threshold = _threshold()
+    scores = log.get("scores", {})
+    ranks = {user_id: rank for rank, (user_id, _) in enumerate(
+        sorted(scores.items(), key=lambda item: item[1], reverse=True), start=1)}
+    matched_user = next((u for u, d in log["decisions"].items() if d == "matched"), None)
+    trace = log["trace"]
+    try:
+        with conn.transaction():
+            run = conn.execute(
+                """
+                insert into jev_runs (user_id, my_summary, my_topic, threshold, candidate_count,
+                                      request, response, duration_ms, outcome, error, match_id, matched_user_id)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                returning id
+                """,
+                (
+                    me, my_summary, topic, threshold, len(log["candidates"]),
+                    Json(trace["request"]) if "request" in trace else None,
+                    Json(trace["response"]) if "response" in trace else None,
+                    trace.get("duration_ms"), log["outcome"],
+                    result["skipped_reason"] if log["outcome"] in ("jev_error", "sharing_off", "no_candidates") else None,
+                    result["match_id"], matched_user,
+                ),
+            ).fetchone()
+            # Jev only sees the first MAX_CANDIDATES; labels match jev.score_candidates.
+            for index, candidate in enumerate(log["candidates"][: jev.MAX_CANDIDATES], start=1):
+                user_id = candidate["user_id"]
+                score = scores.get(user_id)
+                if log["outcome"] == "jev_error" or score is None:
+                    decision = "no_answer"
+                elif user_id in log["decisions"]:
+                    decision = log["decisions"][user_id]
+                elif score < threshold:
+                    decision = "below_threshold"
+                else:
+                    decision = "not_tried"  # good enough, but someone ranked higher got the match
+                conn.execute(
+                    """
+                    insert into jev_comparisons (run_id, person_label, candidate_user_id, candidate_name,
+                                                 candidate_summary, candidate_topic, score, rank, decision)
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        run["id"], f"Person {index}", user_id, candidate["name"],
+                        candidate["task_summary"], candidate.get("topic"), score, ranks.get(user_id), decision,
+                    ),
+                )
+        conn.commit()
+    except Exception as err:  # noqa: BLE001 - logging is best effort
+        print(f"[jev-log] could not write the run log: {err}")
 
 
 def _active_seconds() -> int:

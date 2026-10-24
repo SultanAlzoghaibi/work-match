@@ -115,6 +115,16 @@ fn on_poll<R: Runtime>(app: &tauri::AppHandle<R>, matches: Vec<MatchView>) {
     }
     let is_new = current.map(|shown| shown.match_id) != Some(view.match_id);
     let answerable = view.my_status == "pending" && !view.expired;
+    if is_new {
+        // One line per new match, so a popup that never shows can be traced.
+        println!(
+            "[match] poll saw match {} (me {}, expired {}): {}",
+            view.match_id,
+            view.my_status,
+            view.expired,
+            if answerable { "showing popup" } else { "not answerable, no popup" }
+        );
+    }
     show_state(app, view);
     if is_new && answerable {
         crate::window::show_match_popup(app);
@@ -133,6 +143,7 @@ pub fn backend_target<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<(String, 
 #[tauri::command]
 pub fn start_match_polling<R: Runtime>(app: tauri::AppHandle<R>, user_id: String, api_url: String) {
     let state = app.state::<MatchState>();
+    println!("[match] polling {api_url} as user {user_id}");
     *state.config.lock().unwrap() = Some(PollConfig { user_id, api_url });
     if state.polling.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return; // page reload or new sign-in: the loop picks up the new config

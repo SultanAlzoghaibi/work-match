@@ -96,15 +96,29 @@ body {
   pointer-events: none;
 }
 
-.titlebar-status {
+.titlebar-right {
   position: absolute;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titlebar-status {
   font-size: var(--text-caption);
   font-weight: 700;
   padding: 3px 10px;
   border: var(--outline);
   border-radius: var(--radius-pill);
   background: var(--color-soft-mist);
+}
+
+.theme-toggle {
+  padding: 2px 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .titlebar-status.on {

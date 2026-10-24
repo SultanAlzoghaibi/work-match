@@ -18,6 +18,10 @@
   --color-pencil-gray: #777777;
   --color-faded-gray: #afafaf;
   --color-swan: #e5e5e5;
+  --color-subtle: #f7f7f7;
+  --color-on-accent: #ffffff;
+  --color-error-wash: #ffdfe0;
+  --color-error-text: #ea2b2b;
 
   --radius-duo: 12px;
   --radius-card-duo: 16px;
@@ -33,9 +37,59 @@
   color: var(--color-charcoal);
 }
 
+/* Dark mode: same rules, darker tokens (Duolingo's own dark palette with the
+   Meta blue lifted so it reads on the dark canvas). Follows the Mac's setting
+   unless the title-bar toggle picked one (html[data-theme]). */
+:root[data-theme="dark"] {
+  --color-navy: #3d9bff;
+  --color-navy-deep: #0a5bc4;
+  --color-navy-wash: rgba(0, 129, 251, 0.16);
+  --meta-gradient: linear-gradient(135deg, #4aa8ff 0%, #1a7cf5 100%);
+  --color-spark-blue: #4aa8ff;
+  --color-paper-white: #131f24;
+  --color-charcoal: #f1f7fb;
+  --color-pencil-gray: #a3b3bb;
+  --color-faded-gray: #6f8590;
+  --color-swan: #37464f;
+  --color-subtle: #1a2a31;
+  --color-error-wash: rgba(255, 75, 75, 0.15);
+  --color-error-text: #ff7a7a;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-navy: #3d9bff;
+    --color-navy-deep: #0a5bc4;
+    --color-navy-wash: rgba(0, 129, 251, 0.16);
+    --meta-gradient: linear-gradient(135deg, #4aa8ff 0%, #1a7cf5 100%);
+    --color-spark-blue: #4aa8ff;
+    --color-paper-white: #131f24;
+    --color-charcoal: #f1f7fb;
+    --color-pencil-gray: #a3b3bb;
+    --color-faded-gray: #6f8590;
+    --color-swan: #37464f;
+    --color-subtle: #1a2a31;
+    --color-error-wash: rgba(255, 75, 75, 0.15);
+    --color-error-text: #ff7a7a;
+    color-scheme: dark;
+  }
+}
+
 html,
 body {
   background: var(--color-paper-white);
+}
+
+/* --- Light / dark toggle in the title bar ---------------------------------- */
+
+.theme-toggle {
+  padding: 2px 8px 1px;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  border-bottom-width: 3px;
+  color: var(--color-pencil-gray);
 }
 
 /* --- Title bar ------------------------------------------------------------- */
@@ -150,7 +204,7 @@ button:active:not(:disabled) {
 
 button.primary {
   background: var(--meta-gradient);
-  color: var(--color-paper-white);
+  color: var(--color-on-accent);
   border-color: var(--color-navy-deep);
 }
 
@@ -164,7 +218,7 @@ button.secondary {
 }
 
 button.secondary:hover:not(:disabled) {
-  background: #f7f7f7;
+  background: var(--color-subtle);
 }
 
 button.link {
@@ -187,7 +241,7 @@ button:disabled {
 button.secondary.danger {
   background: #ff4b4b;
   border-color: #ea2b2b;
-  color: var(--color-paper-white);
+  color: var(--color-on-accent);
 }
 
 /* Tabs: selected one is a navy-tinted pill, the rest are quiet gray. */
@@ -226,10 +280,10 @@ button.secondary.danger {
 }
 
 .error {
-  background: #ffdfe0;
+  background: var(--color-error-wash);
   border: 2px solid #ff4b4b;
   border-radius: var(--radius-duo);
-  color: #ea2b2b;
+  color: var(--color-error-text);
   font-weight: 700;
 }
 
@@ -253,7 +307,7 @@ button.secondary.danger {
 }
 
 .sync.fail {
-  background: #ffdfe0;
+  background: var(--color-error-wash);
   border-color: #ff4b4b;
 }
 
@@ -291,7 +345,7 @@ button.secondary.danger {
 }
 
 .friend.offline {
-  background: #f7f7f7;
+  background: var(--color-subtle);
   opacity: 0.8;
 }
 
@@ -302,7 +356,7 @@ button.secondary.danger {
 }
 
 .dev-pre {
-  background: #f7f7f7;
+  background: var(--color-subtle);
 }
 
 .dev-check .dot {
@@ -335,7 +389,7 @@ button.secondary.danger {
 input,
 select {
   color: var(--color-charcoal);
-  background: #f7f7f7;
+  background: var(--color-subtle);
   border: var(--edge);
   border-radius: var(--radius-duo);
   padding: 11px 16px;
