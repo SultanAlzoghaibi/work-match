@@ -14,6 +14,15 @@ invoke("start_match_polling", { userId: MOCK_USER_ID, apiUrl: API_URL }).catch(c
 
 const root = document.getElementById("root");
 
+// Cmd+Q (Ctrl+Q on Windows) quits the app, tray icon included. The red close
+// button only hides the window.
+document.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "q") {
+    event.preventDefault();
+    invoke("quit_app");
+  }
+});
+
 /// Result of the last Save, shown once on the profile view.
 let syncStatus = null;
 
@@ -182,7 +191,12 @@ function renderProfile(profile) {
       el(
         "footer",
         {},
-        el("button", { class: "link", onclick: () => logout().then(render, renderError) }, "Log out"),
+        el(
+          "div",
+          {},
+          el("button", { class: "link", onclick: () => logout().then(render, renderError) }, "Log out"),
+          el("button", { class: "link", title: "Quit work-match (⌘Q)", onclick: () => invoke("quit_app") }, "Quit"),
+        ),
         el("button", { class: "primary", onclick: () => renderEdit(profile) }, "Edit"),
       ),
     ),

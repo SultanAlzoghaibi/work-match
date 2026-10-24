@@ -19,6 +19,12 @@ pub const MATCH_LABEL: &str = "match";
 /// plugins.sql.preload in tauri.conf.json and src/db.js.
 pub const DB_FILE: &str = "sqlite:work_match.db";
 
+/// Quit the whole app (tray icon included) from the window's Quit button / Cmd+Q.
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 /// Expose the compile-time target OS to the frontend (src/main.js).
 /// Returns "macos" | "linux" | "windows".
 #[tauri::command]
@@ -148,6 +154,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             os_name,
+            quit_app,
             match_popup::trigger_mock_match,
             match_popup::current_match,
             match_popup::respond_match,
