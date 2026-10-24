@@ -1,7 +1,9 @@
 # Database
 
-The schema lives in [`backend/schema.sql`](../backend/schema.sql). It's written in SQLite
-syntax for now; the backend will run on Supabase (Postgres).
+The schema lives in [`backend/schema.sql`](../backend/schema.sql) and runs on Supabase
+(Postgres). `users.id` is a UUID (`gen_random_uuid()`), so every user reference is a
+`uuid`. Match and connection ids stay `bigint`. The examples in USE_CASE.md use small
+numbers like `1` and `2` for readability.
 
 ## Match vs connection
 

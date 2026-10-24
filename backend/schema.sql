@@ -16,11 +16,12 @@
 
 -- 1. Who someone is. Permanent.
 create table users (
-    id              bigint generated always as identity primary key,
+    id              uuid        primary key default gen_random_uuid(),   -- the app may also pick it
     token           text        not null unique,                 -- TODO: store a hash
     name            text        not null,
     school          text,
     bio             text,                                        -- shown in match popup
+    discord_handle  text,                                        -- used to start the call
     age_group       text        check (age_group in ('under_18','18_24','25_34','35_44','45_plus')),
     country         char(2),                                     -- ISO code, e.g. 'CA'
     sharing_enabled boolean     not null default false,
@@ -30,7 +31,7 @@ create table users (
 -- 2. What each person is doing right now. One row per user, overwritten every push,
 --    deleted on app quit or pause.
 create table curr_task (
-    user_id      bigint      primary key references users(id) on delete cascade,
+    user_id      uuid        primary key references users(id) on delete cascade,
     task_summary text        not null,                           -- built on the device, shown to matches
     topic        text,                                           -- short label, e.g. 'LeetCode'
     pushed_at    timestamptz not null default now()
@@ -40,8 +41,8 @@ create table curr_task (
 --    Each side answers the popup separately.
 create table matches (
     id         bigint generated always as identity primary key,
-    user_a     bigint      not null references users(id) on delete cascade,
-    user_b     bigint      not null references users(id) on delete cascade,
+    user_a     uuid        not null references users(id) on delete cascade,
+    user_b     uuid        not null references users(id) on delete cascade,
     topic      text        not null,                             -- no summaries stored here
     score      real        check (score between 0 and 1),        -- Jev P(good match)
     a_status   text        not null default 'pending' check (a_status in ('pending','accepted','declined')),
@@ -62,8 +63,8 @@ create unique index uq_matches_pending_pair
 -- 4. Two people follow each other on a topic. Permanent.
 create table connections (
     id         bigint generated always as identity primary key,
-    user_a     bigint      not null references users(id) on delete cascade,
-    user_b     bigint      not null references users(id) on delete cascade,
+    user_a     uuid        not null references users(id) on delete cascade,
+    user_b     uuid        not null references users(id) on delete cascade,
     topic      text        not null,
     match_id   bigint      references matches(id) on delete set null,   -- the call that started it
     created_at timestamptz not null default now(),
@@ -77,7 +78,7 @@ create index idx_connections_user_b on connections (user_b);   -- user_a covered
 --    Usually empty. Rows are rewritten on every push and removed on quit or timeout.
 create table is_working_on_connections (
     connection_id bigint      not null references connections(id) on delete cascade,
-    user_id       bigint      not null references users(id)       on delete cascade,
+    user_id       uuid        not null references users(id)       on delete cascade,
     seen_at       timestamptz not null default now(),
     primary key (connection_id, user_id)
 );
@@ -93,17 +94,18 @@ alter table is_working_on_connections enable row level security;
 -- Create a match safely. Returns the new match id, or null if skipped.
 -- The advisory locks make concurrent pushes involving the same person wait for each
 -- other, so one person never gets two popups at once.
-create function create_match(p_a bigint, p_b bigint, p_topic text, p_score real)
+create function create_match(p_a uuid, p_b uuid, p_topic text, p_score real)
 returns bigint
 language plpgsql
 as $$
 declare
-    lo bigint := least(p_a, p_b);
-    hi bigint := greatest(p_a, p_b);
+    lo uuid := least(p_a, p_b);
+    hi uuid := greatest(p_a, p_b);
     new_id bigint;
 begin
-    perform pg_advisory_xact_lock(lo);
-    perform pg_advisory_xact_lock(hi);
+    -- Advisory locks take a bigint key, so hash the uuid.
+    perform pg_advisory_xact_lock(hashtextextended(lo::text, 0));
+    perform pg_advisory_xact_lock(hashtextextended(hi::text, 0));
 
     if exists (
         select 1 from matches

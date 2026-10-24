@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { MOCK_USER_ID, updateUser } from "./api.js";
 import { AGE_GROUPS, loadProfile, logout, mockLogin, saveProfile } from "./profile.js";
 
 // Same idea as TyA's getOs(): ask Rust for the target OS instead of sniffing
@@ -8,6 +9,9 @@ const os = await invoke("os_name").catch(() => "unknown");
 document.documentElement.classList.add(os === "macos" ? "os-macos" : "os-other");
 
 const root = document.getElementById("root");
+
+/// Result of the last Save, shown once on the profile view.
+let syncStatus = null;
 
 /// Tiny DOM helper. Text always goes through textContent, never innerHTML.
 function el(tag, attrs = {}, ...children) {
@@ -92,6 +96,7 @@ function renderProfile(profile) {
           el("p", { class: "muted" }, profile.bio || "No bio yet"),
         ),
       ),
+      syncStatus ? el("p", { class: `sync ${syncStatus.ok ? "ok" : "fail"}` }, syncStatus.text) : null,
       el(
         "div",
         { class: "details" },
@@ -152,8 +157,16 @@ function renderEdit(profile) {
         data.sharing_enabled = sharing.checked;
         data.country = (data.country ?? "").toUpperCase();
         try {
+          // Local first so the edit is never lost, then the backend.
           await saveProfile(data);
+          try {
+            await updateUser(MOCK_USER_ID, data);
+            syncStatus = { ok: true, text: "Saved to the server." };
+          } catch (err) {
+            syncStatus = { ok: false, text: `Saved on this Mac only. Server: ${err.message}` };
+          }
           await render();
+          syncStatus = null;
         } catch (err) {
           renderError(err);
         }

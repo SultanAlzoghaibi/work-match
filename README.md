@@ -57,4 +57,8 @@ yarn tauri dev
 
 Left-click the smiling globe in the menu bar to open the app window. Closing the window keeps work-match running in the menu bar; right-click → Quit to exit.
 
+## Run the backend
+
+See [backend/README.md](backend/README.md). The profile Edit form saves to the local SQLite first, then `PATCH /users/{id}` on the FastAPI backend at `http://127.0.0.1:8000`.
+
 See [docs/DESIGN.md](docs/DESIGN.md) for the design doc.

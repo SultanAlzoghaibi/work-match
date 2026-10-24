@@ -203,6 +203,23 @@ footer {
   opacity: 0.4;
 }
 
+.sync {
+  margin-top: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.sync.ok {
+  background: rgba(80, 200, 120, 0.15);
+  color: #a6f0bf;
+}
+
+.sync.fail {
+  background: rgba(255, 90, 90, 0.15);
+  color: #ffb4b4;
+}
+
 /* Edit form */
 .edit {
   gap: 8px;
