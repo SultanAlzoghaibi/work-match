@@ -12,6 +12,10 @@ Variants:
   topic+strict  Both changes.
   general     Topic + criteria written as general rules, with no examples taken
               from the pair files (the fair version of topic+strict).
+  two-*       Two questions per candidate in one request: same kind of activity
+              (general criteria) and same specific goal or subject. two-goal uses
+              the second answer alone; two-product / two-min / two-mean combine them.
+              fresh_pairs.json was written before these and never used to tune them.
 
 Jev answers are cached in .jev_cache.json, keyed by the exact request, so a
 re-run only calls Jev for requests it hasn't seen. --no-calls refuses to call
@@ -174,6 +178,49 @@ def ask_jev(key: str, me: dict, others: list[dict], with_topic: bool, criteria: 
     return [float(answers[f"c{i}"]["noul"]) for i in range(1, len(others) + 1)]
 
 
+# Second question for the two-question variants: is the specific goal or subject
+# the same? General wording only, like GENERAL_CRITERIA.
+GOAL_INSTRUCTIONS = "Are Me and Person {i} working toward the same specific goal or on the same specific subject?"
+GOAL_CRITERIA = {
+    "true": "Their work serves the same specific goal or subject, even if each works on a different part, step or skill of it.",
+    "false": (
+        "They want different outcomes, or their work is about a different subject, field or "
+        "place, even if the task they are doing looks the same."
+    ),
+}
+
+
+def ask_two(key: str, me: dict, others: list[dict], sultan) -> list[tuple[float, float]]:
+    """One request, two questions per candidate: same kind of activity (a), same
+    specific goal or subject (g). Returns (a, g) per candidate."""
+    state = [line("Me", me, True)]
+    questions = {}
+    for index, other in enumerate(others, start=1):
+        state.append(line(f"Person {index}", other, True))
+        questions[f"a{index}"] = {
+            "type": "noul",
+            "instructions": (
+                f"Are Me and Person {index} doing the same kind of activity, so that "
+                "working side by side would help them both?"
+            ),
+            "criteria": GENERAL_CRITERIA,
+        }
+        questions[f"g{index}"] = {
+            "type": "noul",
+            "instructions": GOAL_INSTRUCTIONS.format(i=index),
+            "criteria": GOAL_CRITERIA,
+        }
+    response = CACHED_HTTPX.post(
+        sultan.JEV_URL,
+        headers={"Authorization": f"Bearer {key}"},
+        json={"model": sultan.JEV_MODEL, "state": state, "questions": questions},
+        timeout=60,
+    )
+    response.raise_for_status()
+    answers = response.json()["answers"]
+    return [(float(answers[f"a{i}"]["noul"]), float(answers[f"g{i}"]["noul"])) for i in range(1, len(others) + 1)]
+
+
 def score_current(sultan, me: dict, others: list[dict]) -> list[float]:
     """Production code path, unchanged."""
     candidates = [{"user_id": i, "task_summary": o["task_summary"]} for i, o in enumerate(others)]
@@ -247,13 +294,13 @@ def rank(groups: list[dict], scorer, threshold: float) -> dict:
     return out
 
 
-PAIR_FILES = ["match_pairs.json", "holdout_pairs.json", "extra_pairs.json"]
+PAIR_FILES = ["match_pairs.json", "holdout_pairs.json", "extra_pairs.json", "fresh_pairs.json"]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="word-overlap baseline, no API calls")
-    parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict, general")
+    parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict, general, two-goal, two-product, two-min, two-mean")
     parser.add_argument("--no-calls", action="store_true", help="only use cached Jev answers; never call Jev")
     parser.add_argument("--threshold", type=float, default=float(os.environ.get("MATCH_THRESHOLD", "0.8")),
                         help="threshold used for 'right at' and the ranking checks")
@@ -284,6 +331,11 @@ def main() -> None:
             "strict": lambda me, others: ask_jev(key, me, others, False, STRICT_CRITERIA, sultan),
             "topic+strict": lambda me, others: ask_jev(key, me, others, True, STRICT_CRITERIA, sultan),
             "general": lambda me, others: ask_jev(key, me, others, True, GENERAL_CRITERIA, sultan),
+            # Same request (cached once), combined four ways.
+            "two-goal": lambda me, others: [g for a, g in ask_two(key, me, others, sultan)],
+            "two-product": lambda me, others: [a * g for a, g in ask_two(key, me, others, sultan)],
+            "two-min": lambda me, others: [min(a, g) for a, g in ask_two(key, me, others, sultan)],
+            "two-mean": lambda me, others: [(a + g) / 2 for a, g in ask_two(key, me, others, sultan)],
         }
         runs = [(v, variants[v]) for v in (args.variant or variants)]
 

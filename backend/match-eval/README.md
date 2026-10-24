@@ -62,4 +62,25 @@ production). Re-scored at each threshold from `.jev_cache.json` with no extra ca
 - Jev scores move a little between runs (e.g. 0.58 → 0.65 for the same pair), so treat
   differences under ~0.1 as noise.
 
+### Two-question variants (scored fairly)
+
+`fresh_pairs.json` (24) was written and committed before the two-question variants
+existed. Each variant's threshold was picked on the other 68 pairs only, then graded on
+the fresh 24.
+
+| Variant | Threshold (from the 68) | 68 pairs | Fresh 24 | Ranking: top / every candidate |
+|---|---|---|---|---|
+| `current` | 0.35 | 84% | 79% | 5/5 · 4/5 |
+| **`general`** | 0.45 | **93%** | 88% | **5/5 · 5/5** |
+| `two-product` | 0.15 | 91% | **96%** | 5/5 · 4/5 |
+| `two-mean` | 0.25 | 93% | 92% | 5/5 · 3/5 |
+| `two-goal` / `two-min` | 0.20 | 88–90% | 96% | 4–5/5 · 3/5 |
+
+- The second question fixes "same task, different field" on fresh pairs (nursing vs
+  accounting resumes), but gives a little back elsewhere; over all 92 pairs it's ~92% vs
+  ~91%, within Jev's run-to-run noise. Its 0.15 threshold is also fragile.
+- Recommendation stays **`general` at 0.45**; `two-product` is an option if avoiding
+  wrong-field matches matters most.
+- Every variant matches used cars in Denver vs Miami (same task, different city).
+
 Earlier runs (24 + 12 pairs, before `general` and the extra pairs) are in git history.
