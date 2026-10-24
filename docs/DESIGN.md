@@ -79,6 +79,17 @@ Behaviour:
 - Click away → hides. Right-click → menu → Quit.
 - Windows: same, but hides on window blur and uses a CSS translucent card.
 
+### Local SQLite
+
+- The file is `work_match.db` in `~/Library/Application Support/com.sultanalzoghaibi.workmatch/`. It is opened by `tauri-plugin-sql`, which is preloaded at startup.
+- `src-tauri/src/migrations/001_init_local.sql` holds the local-only tables:
+  - `curr_user_profile`: a single row for the signed-in user and token
+  - `activity_log`: app and calendar stretches, plus a derived `topic`
+  - `settings`
+- Raw activity stays on the device. Only the topic goes to the backend, whose schema is in `backend/schema.sql`.
+- Demo data lives in `src-tauri/src/seed/defaults.sql` and is applied by `db::seeder::seed_defaults`. It is **not run by default**. To use it, uncomment the call in `lib.rs` setup.
+- The frontend opens the same DB via `src/db.js` (`getDb()`).
+
 ### Borrowed from TyA_Tauri
 Copied and trimmed from the TypeAnywhere app: `tauri-nspanel` panel conversion, `monitor` cursor-monitor centering, `window-vibrancy` 0.7 `apply_liquid_glass`, `sw_vers` macOS-26 check, Accessory policy and activate-before-show pattern.
 Left out: global shortcut, SQLite, updater, autostart, websocket, telemetry, reminders.

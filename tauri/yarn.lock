@@ -262,7 +262,7 @@
   resolved "https://registry.yarnpkg.com/@rollup/rollup-win32-x64-msvc/-/rollup-win32-x64-msvc-4.65.0.tgz#4e24b35aee8d6c29f4a99fb650bed372371f8141"
   integrity sha512-wPWi++K4Bs1VR4XihOhfGi4IGX6Cub7FlerTf8X2v+2BtDHddgSqWCXwGD+h2yAe4/niIhNDwAltioOC+wEogQ==
 
-"@tauri-apps/api@^2":
+"@tauri-apps/api@^2", "@tauri-apps/api@^2.12.0":
   version "2.12.4"
   resolved "https://registry.yarnpkg.com/@tauri-apps/api/-/api-2.12.4.tgz#2bab72b87696ae8dcfb4f4db2119e46a87aeabe0"
   integrity sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==
@@ -338,6 +338,13 @@
     "@tauri-apps/cli-win32-arm64-msvc" "2.12.4"
     "@tauri-apps/cli-win32-ia32-msvc" "2.12.4"
     "@tauri-apps/cli-win32-x64-msvc" "2.12.4"
+
+"@tauri-apps/plugin-sql@~2":
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-sql/-/plugin-sql-2.6.0.tgz#b8f52c40e1798288649c9fbc7744f89f94828ac0"
+  integrity sha512-UfP4p3Zwh6N7ODRMgnMgXSN6rfUxFo7YXHnRjX8L3Vx7i+IV0bh+r8puwv2OnGq04SLDZFY+LvotxN+pJdZ1Zg==
+  dependencies:
+    "@tauri-apps/api" "^2.12.0"
 
 "@types/estree@1.0.9":
   version "1.0.9"
