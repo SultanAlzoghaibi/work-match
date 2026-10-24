@@ -34,21 +34,32 @@ label, different subject or city) and plain unrelated pairs.
 
 ## Results
 
-Run 2026-10-24 with `jev-latest`. First number: `match_pairs.json` (24). Second:
-`holdout_pairs.json` (12 pairs on subjects no variant mentions).
+Final run, 2026-10-24, `jev-latest`: 68 counted pairs across `match_pairs.json` (24),
+`holdout_pairs.json` (12) and `extra_pairs.json` (32, 5 more marked `unsure` and not
+counted), plus 5 ranking groups (one person vs 5 candidates in one request, like
+production). Re-scored at each threshold from `.jev_cache.json` with no extra calls.
 
-| Variant | Right at 0.8 | Best threshold | Highest non-match | Lowest match |
-|---|---|---|---|---|
-| word overlap (no AI) | 50% | 71% at 0.25 | 0.29 | 0.00 |
-| `current` | 75% / 58% | 96% at 0.60 / 92% at 0.60 | 0.58 / 0.48 | 0.38 / 0.32 |
-| `with-topic` | 83% / 67% | 92% at 0.70 / 83% at 0.50 | 0.67 / 0.73 | 0.43 / 0.32 |
-| `strict` | 88% / 75% | 100% at 0.45 / 100% at 0.35 | 0.06 / 0.14 | 0.45 / 0.37 |
-| `topic+strict` | 88% / 83% | 100% at 0.45 / 100% at 0.45 | 0.08 / 0.14 | 0.47 / 0.46 |
+| | Right (68 pairs) | Ranking: top pick right | Ranking: every candidate right |
+|---|---|---|---|
+| word overlap, no AI (best threshold) | 72% | – | – |
+| **`current` at 0.8 (production today)** | **62%** | **1/5** | 0/5 |
+| `current` at its best threshold (0.35) | 84% | 5/5 | 4/5 |
+| `general` at 0.8 | 84% | 4/5 | 3/5 |
+| **`general` at 0.45** | **93%** | **5/5** | **5/5** |
 
-Takeaways:
-- A 0.8 threshold misses real matches with every variant (half of them on the held-out set with `current`).
-- `current` can't separate the groups: some non-matches score above some matches.
-- `strict` / `topic+strict` leave a wide gap (non-matches ≤ ~0.14, matches ≥ ~0.46) that holds on
-  the held-out subjects. Suggested: `topic+strict` with a threshold around 0.3.
-- Caveat: 36 pairs, labelled by us, and the `strict` criteria's examples overlap with
-  `match_pairs.json`; the held-out set is the fairer check.
+- **Production misses most matches today.** At 0.8, 4 of the 5 ranking groups get no match
+  at all, including Dijkstra code vs a shortest-path lecture (0.73–0.78).
+- **`general` + threshold 0.45 is the recommended setting**: best on every file (96% /
+  100% / 91%) and on ranking.
+- **Still wrong with `general` at 0.45 (5):** same goal in a different area scores low
+  (coding vs behavioral interview prep 0.18, interview prep vs system design 0.34, contracts
+  vs torts 0.22), and the same task in a different field or city scores high (cover letters
+  for marketing vs software 0.75, apartments in SF vs Brooklyn 0.65). Several of these are
+  judgment calls in our labels.
+- **The earlier `topic+strict` 100% was inflated.** Its criteria named cities and subjects
+  from the pair files: SF vs Brooklyn apartments scored 0.08 with it and 0.65 with
+  `general`, which names none.
+- Jev scores move a little between runs (e.g. 0.58 → 0.65 for the same pair), so treat
+  differences under ~0.1 as noise.
+
+Earlier runs (24 + 12 pairs, before `general` and the extra pairs) are in git history.

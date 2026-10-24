@@ -198,7 +198,8 @@ def score_overlap(me: dict, others: list[dict]) -> list[float]:
 
 # Report ------------------------------------------------------------------------
 
-def evaluate(name: str, pairs: list[dict], scorer, threshold: float) -> dict:
+def score_pairs(pairs: list[dict], scorer) -> list[tuple[dict, float]]:
+    """Pairs sharing the same `a` go in one request, like production."""
     groups = defaultdict(list)
     for pair in pairs:
         groups[json.dumps(pair["a"], sort_keys=True)].append(pair)
@@ -206,21 +207,47 @@ def evaluate(name: str, pairs: list[dict], scorer, threshold: float) -> dict:
     for group in groups.values():
         scores = scorer(group[0]["a"], [p["b"] for p in group])
         scored += [(p, s) for p, s in zip(group, scores)]
+    return scored
+
+
+def summarize(scored: list[tuple[dict, float]], threshold: float) -> dict:
+    """Accuracy over decided pairs; `unsure` pairs are listed but not counted."""
+    decided = [(p, s) for p, s in scored if not p.get("unsure")]
 
     def accuracy(t):
-        return sum((s >= t) == p["match"] for p, s in scored) / len(scored)
+        return sum((s >= t) == p["match"] for p, s in decided) / len(decided)
 
     best_t = max((t / 100 for t in range(5, 100, 5)), key=lambda t: (accuracy(t), -abs(t - threshold)))
-    yes = [s for p, s in scored if p["match"]]
-    no = [s for p, s in scored if not p["match"]]
-    wrong = [(p, s) for p, s in scored if (s >= threshold) != p["match"]]
+    yes = [s for p, s in decided if p["match"]]
+    no = [s for p, s in decided if not p["match"]]
     return {
-        "variant": name, "accuracy": accuracy(threshold), "best_threshold": best_t,
+        "pairs": len(decided), "accuracy": accuracy(threshold), "best_threshold": best_t,
         "best_accuracy": accuracy(best_t), "mean_match": sum(yes) / len(yes),
         "mean_nonmatch": sum(no) / len(no), "lowest_match": min(yes), "highest_nonmatch": max(no),
-        "wrong": [{"id": p["id"], "kind": p["kind"], "expected": p["match"], "score": round(s, 3)} for p, s in wrong],
+        "wrong": [{"id": p["id"], "kind": p["kind"], "expected": p["match"], "score": round(s, 3)}
+                  for p, s in decided if (s >= threshold) != p["match"]],
+        "unsure": {p["id"]: round(s, 3) for p, s in scored if p.get("unsure")},
         "scores": {p["id"]: round(s, 3) for p, s in scored},
     }
+
+
+def rank(groups: list[dict], scorer, threshold: float) -> dict:
+    """One request per group with all candidates, like production."""
+    out = {"groups": len(groups), "top_is_good": 0, "all_correct": 0, "details": []}
+    for g in groups:
+        scores = scorer(g["me"], g["candidates"])
+        best = max(range(len(scores)), key=lambda i: scores[i])
+        top_ok = bool(g["candidates"][best].get("good")) and scores[best] >= threshold
+        all_ok = all((s >= threshold) == bool(c.get("good")) for c, s in zip(g["candidates"], scores))
+        out["top_is_good"] += top_ok
+        out["all_correct"] += all_ok
+        out["details"].append({"id": g["id"], "top_ok": top_ok, "all_ok": all_ok,
+                               "scores": [round(s, 3) for s in scores],
+                               "good": [bool(c.get("good")) for c in g["candidates"]]})
+    return out
+
+
+PAIR_FILES = ["match_pairs.json", "holdout_pairs.json", "extra_pairs.json"]
 
 
 def main() -> None:
@@ -228,13 +255,20 @@ def main() -> None:
     parser.add_argument("--offline", action="store_true", help="word-overlap baseline, no API calls")
     parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict, general")
     parser.add_argument("--no-calls", action="store_true", help="only use cached Jev answers; never call Jev")
-    parser.add_argument("--threshold", type=float, default=float(os.environ.get("MATCH_THRESHOLD", "0.8")))
+    parser.add_argument("--threshold", type=float, default=float(os.environ.get("MATCH_THRESHOLD", "0.8")),
+                        help="threshold used for 'right at' and the ranking checks")
+    parser.add_argument("--pairs", action="append", help=f"pair file(s); default: {', '.join(PAIR_FILES)}")
+    parser.add_argument("--no-ranking", action="store_true", help="skip ranking_groups.json")
     parser.add_argument("--json", help="also write full results here")
-    parser.add_argument("--pairs", default="match_pairs.json", help="pairs file (holdout_pairs.json for the held-out check)")
     args = parser.parse_args()
 
-    pairs = json.loads((HERE / args.pairs).read_text())["pairs"]
-    print(f"{len(pairs)} pairs ({sum(p['match'] for p in pairs)} should match), threshold {args.threshold}\n")
+    files = args.pairs or PAIR_FILES
+    sets = {f: json.loads((HERE / f).read_text())["pairs"] for f in files}
+    groups = [] if args.no_ranking else json.loads((HERE / "ranking_groups.json").read_text())["groups"]
+    total = sum(len(p) for p in sets.values())
+    unsure = sum(bool(x.get("unsure")) for p in sets.values() for x in p)
+    print(f"{total} pairs in {len(files)} file(s) ({unsure} marked unsure, not counted), "
+          f"{len(groups)} ranking groups, threshold {args.threshold}\n")
 
     if args.offline:
         runs = [("word-overlap", score_overlap)]
@@ -256,18 +290,37 @@ def main() -> None:
     CACHED_HTTPX.allow_calls = not args.no_calls
     results = []
     for name, scorer in runs:
-        r = evaluate(name, pairs, scorer, args.threshold)
+        per_file = {f: score_pairs(pairs, scorer) for f, pairs in sets.items()}
+        everything = [x for scored in per_file.values() for x in scored]
+        r = {"variant": name, "all": summarize(everything, args.threshold),
+             "files": {f: summarize(scored, args.threshold) for f, scored in per_file.items()}}
+        if groups:
+            r["ranking"] = rank(groups, scorer, args.threshold)
         results.append(r)
-        print(f"{name:13} accuracy {r['accuracy']:.0%} at {args.threshold} | best {r['best_accuracy']:.0%} at {r['best_threshold']:.2f} "
-              f"| mean score: match {r['mean_match']:.2f}, non-match {r['mean_nonmatch']:.2f} "
-              f"| lowest match {r['lowest_match']:.2f}, highest non-match {r['highest_nonmatch']:.2f}")
-        for w in r["wrong"]:
-            print(f"    wrong: {w['id']:32} {w['kind']:45} expected {'match' if w['expected'] else 'no match':8} score {w['score']:.2f}")
+
+        a = r["all"]
+        print(f"== {name}: {a['accuracy']:.0%} right at {args.threshold} | best {a['best_accuracy']:.0%} at {a['best_threshold']:.2f} "
+              f"| lowest match {a['lowest_match']:.2f}, highest non-match {a['highest_nonmatch']:.2f}")
+        for f, fr in r["files"].items():
+            print(f"   {f:20} {fr['pairs']:3} pairs: {fr['accuracy']:.0%} at {args.threshold}, best {fr['best_accuracy']:.0%} at {fr['best_threshold']:.2f}")
+        for w in a["wrong"]:
+            print(f"   wrong: {w['id']:40} expected {'match' if w['expected'] else 'no match':8} score {w['score']:.2f}  ({w['kind']})")
+        if a["unsure"]:
+            print("   unsure (not counted): " + ", ".join(f"{k} {v:.2f}" for k, v in a["unsure"].items()))
+        if groups:
+            g = r["ranking"]
+            print(f"   ranking: top candidate right in {g['top_is_good']}/{g['groups']} groups, "
+                  f"every candidate right in {g['all_correct']}/{g['groups']}")
+            for d in g["details"]:
+                if not d["all_ok"]:
+                    marks = " ".join(f"{s:.2f}{'*' if good else ''}" for s, good in zip(d["scores"], d["good"]))
+                    print(f"      {d['id']:18} {marks}   (* = should match)")
+        print()
     if not args.offline:
-        print(f"\nJev calls made this run: {CACHED_HTTPX.calls} (the rest came from .jev_cache.json)")
+        print(f"Jev calls made this run: {CACHED_HTTPX.calls} (the rest came from .jev_cache.json)")
     if args.json:
         Path(args.json).write_text(json.dumps(results, indent=2))
-        print(f"\nfull results: {args.json}")
+        print(f"full results: {args.json}")
 
 
 if __name__ == "__main__":

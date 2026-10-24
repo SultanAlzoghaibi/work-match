@@ -1,0 +1,45 @@
+{
+  "about": "Ranking checks: one person against several candidates in a single request, like production (up to 20 candidates). good = candidates that should be matched. Checks: the top-scoring candidate is good, every good one is above the threshold, every other one below.",
+  "groups": [
+    {"id": "dijkstra-five",
+     "me": {"topic": "CS 170", "task_summary": "Implementing Dijkstra's algorithm in Python for an algorithms homework"},
+     "candidates": [
+       {"topic": "Writing", "task_summary": "Outlining an argumentative essay for an English class"},
+       {"topic": "Studying", "task_summary": "Watching a lecture on shortest-path algorithms and taking notes", "good": true},
+       {"topic": "Apartment hunting", "task_summary": "Browsing rental listings in Berkeley"},
+       {"topic": "LeetCode", "task_summary": "Solving BFS and graph traversal problems on LeetCode", "good": true},
+       {"topic": "Figma design", "task_summary": "Designing a mobile app login screen in Figma"}]},
+    {"id": "internships-five",
+     "me": {"topic": "Job hunting", "task_summary": "Applying to software engineering internships"},
+     "candidates": [
+       {"topic": "Job hunting", "task_summary": "Searching for registered nurse positions at local hospitals"},
+       {"topic": "Job hunting", "task_summary": "Tailoring a resume for new grad backend developer roles", "good": true},
+       {"topic": "Apartment hunting", "task_summary": "Searching for apartments in Seattle"},
+       {"topic": "Job hunting", "task_summary": "Preparing for software engineering interviews", "good": true},
+       {"topic": "Writing", "task_summary": "Drafting a short story"}]},
+    {"id": "spanish-five",
+     "me": {"topic": "Studying", "task_summary": "Practicing Spanish verb conjugations with flashcards"},
+     "candidates": [
+       {"topic": "Studying", "task_summary": "Learning French vocabulary for a trip to Paris"},
+       {"topic": "Coursework", "task_summary": "Doing a Spanish reading comprehension assignment", "good": true},
+       {"topic": "Coursework", "task_summary": "Doing integration by parts problems for a calculus problem set"},
+       {"topic": "Studying", "task_summary": "Listening to a Spanish podcast for language practice", "good": true},
+       {"topic": "Music", "task_summary": "Practicing fingerstyle guitar arrangements"}]},
+    {"id": "figma-five",
+     "me": {"topic": "Figma design", "task_summary": "Designing onboarding screens for a mobile app in Figma"},
+     "candidates": [
+       {"topic": "Figma design", "task_summary": "Prototyping a website landing page in Figma", "good": true},
+       {"topic": "Photo editing", "task_summary": "Retouching wedding photos in Lightroom"},
+       {"topic": "Web development", "task_summary": "Building a React frontend for a personal portfolio site"},
+       {"topic": "Writing", "task_summary": "Writing App Store marketing copy for a new app"},
+       {"topic": "Figma design", "task_summary": "Building a design system of reusable components in Figma", "good": true}]},
+    {"id": "mcat-five",
+     "me": {"topic": "Studying", "task_summary": "Doing MCAT biochemistry practice questions"},
+     "candidates": [
+       {"topic": "Studying", "task_summary": "Reviewing organic chemistry for the MCAT", "good": true},
+       {"topic": "Studying", "task_summary": "Working through LSAT logic games"},
+       {"topic": "Studying", "task_summary": "Studying for a nursing licensing exam"},
+       {"topic": "Studying", "task_summary": "Taking a full-length MCAT practice test", "good": true},
+       {"topic": "Coursework", "task_summary": "Balancing redox reactions for a chemistry problem set"}]}
+  ]
+}
