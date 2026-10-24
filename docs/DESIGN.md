@@ -71,7 +71,7 @@ Flow: detect activity → summarize on device → push every 5 min → backend r
 
 `tauri/src-tauri/src/`
 - `lib.rs` – builder, tray icon + menu (Open / Quit), Accessory activation policy (no dock icon), liquid glass styling, `os_name` command.
-- `window.rs` – converts the main window to a spotlight-style `NSPanel` (floating, all spaces, nonactivating, 26px corners), opens right under the tray icon.
+- `window.rs` – opens/hides the main window (a normal macOS window) and converts the match popup into a floating, nonactivating `NSPanel` in the top-right corner.
 
 Behaviour:
 - App starts hidden, lives in the menu bar.
@@ -79,7 +79,7 @@ Behaviour:
 - **Match popup** (`match.html`, window label `match`): a separate small **Liquid Glass** panel in the top-right corner, shown only for an incoming match. It never takes focus, has Work together / Not now, and closes itself after 2 min. For now the "Trigger match found" button on the profile raises it with mock data (`match_popup.rs`). Later the `/poll` loop will call `offer_match` with real matches.
 - Clicking other apps does **not** hide it; it stays until toggled from the tray or quit.
 - Right-click → menu → Open / Quit.
-- Windows: same, but centered on screen with a CSS translucent card.
+- Windows: same normal window.
 
 ### Local SQLite
 

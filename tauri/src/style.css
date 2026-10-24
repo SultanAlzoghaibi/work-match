@@ -8,21 +8,32 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: transparent;
+  /* Solid dark window; liquid glass is reserved for the match popup. */
+  background: #1c1c1e;
   overflow: hidden;
   user-select: none;
+}
+
+/* Height of the macOS overlay title bar (traffic lights). */
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 32px;
+  z-index: 1;
 }
 
 #root {
   height: 100%;
   box-sizing: border-box;
-  padding: 22px;
+  padding: 48px 32px 28px;
   display: flex;
   flex-direction: column;
-  border-radius: 26px;
-  /* Solid dark window; liquid glass is reserved for the match popup. */
-  background: #1c1c1e;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  align-items: center;
+}
+
+#root > * {
+  width: 100%;
+  max-width: 520px;
 }
 
 section,
@@ -40,12 +51,12 @@ p {
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 600;
 }
 
 h2 {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -89,8 +100,8 @@ button.secondary:hover {
 }
 
 .trigger {
-  margin-top: 14px;
-  width: 100%;
+  margin-top: 16px;
+  align-self: flex-start;
 }
 
 button:disabled {
@@ -124,7 +135,7 @@ footer {
 }
 
 .login .logo {
-  font-size: 56px;
+  font-size: 72px;
 }
 
 .login button.primary {
@@ -142,8 +153,8 @@ footer {
 
 .avatar {
   flex: none;
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   display: grid;
   place-items: center;

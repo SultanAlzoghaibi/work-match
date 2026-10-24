@@ -2,7 +2,6 @@ mod db;
 mod match_popup;
 mod window;
 
-use crate::window::WebviewWindowExt;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, WebviewWindow};
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -86,10 +85,10 @@ pub fn run() {
                 .icon(tray_icon)
                 .tooltip("work-match")
                 .menu(&menu)
-                // Left click toggles the panel; right click shows the menu.
+                // Left click opens the main window; right click shows the menu.
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "open" => window::open_panel(app),
+                    "open" => window::open_main_window(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -100,22 +99,27 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        window::toggle_panel(tray.app_handle());
+                        window::toggle_main_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
 
-            // Main panel is a solid dark window (CSS); only the match popup
-            // gets liquid glass.
+            // Main window is a normal solid dark window; only the match
+            // popup is a floating panel with liquid glass.
             #[cfg(target_os = "macos")]
             {
-                main_window.to_spotlight_panel()?;
-                match_window.to_match_panel()?;
+                window::to_match_panel(&match_window)?;
                 apply_window_style(&match_window);
             }
 
-            #[cfg(not(target_os = "macos"))]
-            let _ = main_window.center_at_cursor_monitor();
+            // Red close button hides instead of quitting (Quit is in the tray).
+            let app_for_close = app.handle().clone();
+            main_window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    window::hide_main_window(&app_for_close);
+                }
+            });
 
             Ok(())
         })
