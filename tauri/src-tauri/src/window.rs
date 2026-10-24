@@ -46,13 +46,11 @@ pub fn open_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
             #[allow(deprecated)]
             ns_app.activateIgnoringOtherApps(true);
 
-            // Pop out of the tray: start as a small pill right under the
-            // icon, then let AppKit animate the frame up to full size.
-            let (small, full) = tray_anchored_frames(main_thread);
-            let ns_panel = panel.as_panel();
-            ns_panel.setFrame_display(small, true);
+            // Open like any menu-bar app: full size, right under the icon.
+            panel
+                .as_panel()
+                .setFrame_display(tray_anchored_frame(main_thread), true);
             panel.show_and_make_key();
-            ns_panel.setFrame_display_animate(full, true, true);
             return;
         }
         let _ = main_window.show();
@@ -63,18 +61,15 @@ pub fn open_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
 /// Full panel size in points; keep in sync with tauri.conf.json width/height.
 #[cfg(target_os = "macos")]
 const PANEL_SIZE: NSSize = NSSize::new(360.0, 440.0);
-/// Size the panel starts at before it grows out of the tray icon.
-#[cfg(target_os = "macos")]
-const START_SIZE: NSSize = NSSize::new(60.0, 30.0);
 /// Gap between the menu bar / screen edge and the panel.
 #[cfg(target_os = "macos")]
 const EDGE_GAP: f64 = 8.0;
 
-/// (start, end) frames for the open animation, both hanging from the menu
-/// bar under the cursor (which is on the tray icon when it was clicked).
+/// Panel frame hanging from the menu bar under the cursor (which is on the
+/// tray icon when it was clicked), kept on-screen.
 /// Cocoa coordinates: origin bottom-left, y grows upward.
 #[cfg(target_os = "macos")]
-fn tray_anchored_frames(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> (NSRect, NSRect) {
+fn tray_anchored_frame(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> NSRect {
     use tauri_nspanel::objc2_app_kit::{NSEvent, NSScreen};
 
     let mouse = NSEvent::mouseLocation();
@@ -97,17 +92,9 @@ fn tray_anchored_frames(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> 
     let top = visible.origin.y + visible.size.height - EDGE_GAP;
     let min_x = visible.origin.x + EDGE_GAP;
     let max_x = visible.origin.x + visible.size.width - EDGE_GAP;
-    let centered_under_mouse = |width: f64| (mouse.x - width / 2.0).clamp(min_x, max_x - width);
+    let x = (mouse.x - PANEL_SIZE.width / 2.0).clamp(min_x, max_x - PANEL_SIZE.width);
 
-    let small = NSRect::new(
-        NSPoint::new(centered_under_mouse(START_SIZE.width), top - START_SIZE.height),
-        START_SIZE,
-    );
-    let full = NSRect::new(
-        NSPoint::new(centered_under_mouse(PANEL_SIZE.width), top - PANEL_SIZE.height),
-        PANEL_SIZE,
-    );
-    (small, full)
+    NSRect::new(NSPoint::new(x, top - PANEL_SIZE.height), PANEL_SIZE)
 }
 
 /// Windows (and anything non-macOS): plain show + focus on the cursor's monitor.
