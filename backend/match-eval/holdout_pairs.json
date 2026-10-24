@@ -23,7 +23,7 @@
     {"id": "spanish-vs-french", "kind": "hard negative: same kind, different language", "match": false,
      "a": {"topic": "Studying", "task_summary": "Practicing Spanish verb conjugations with flashcards"},
      "b": {"topic": "Studying", "task_summary": "Learning French vocabulary for a trip to Paris"}},
-    {"id": "chicago-vs-austin", "kind": "hard negative: same search, different city", "match": false,
+    {"id": "chicago-vs-austin", "kind": "hard negative: same search, different city", "match": true, "label_note": "team: same search in a different place is a match",
      "a": {"topic": "Apartment hunting", "task_summary": "Browsing two-bedroom rentals in Chicago's Logan Square"},
      "b": {"topic": "Apartment hunting", "task_summary": "Touring condos for sale in Austin, Texas"}},
     {"id": "mcat-vs-lsat", "kind": "hard negative: same kind, different exam", "match": false,

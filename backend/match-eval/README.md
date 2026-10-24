@@ -34,6 +34,28 @@ label, different subject or city) and plain unrelated pairs.
 
 ## Results
 
+### Final, with the team's labels (2026-10-24)
+
+Team decisions on the judgment calls: the same task for a different field is **not** a
+match (cover letters, resumes); the same search in a different place **is** a match
+(apartments, used cars); and the same goal on a different skill or class (coding vs
+behavioral interview prep, contracts vs torts) depends on the **user's filters**, so those
+pairs are marked `unsure` and not scored. 84 pairs counted, 13 not.
+
+| Setup | Right (84 pairs) | Real matches missed | Ranking: top / every candidate |
+|---|---|---|---|
+| **Production today: current wording, 0.8** | **58%** | **33 of 46** | 1/5 · 0/5 |
+| Current wording at its best threshold (0.20) | 85% | | 5/5 · 2/5 |
+| **Proposed: `general` + topic, 0.45** | **96%** | **1 of 46** | **5/5 · 5/5** |
+| `two-product`, 0.15 | 93% | | 5/5 · 4/5 |
+| `two-mean`, 0.25 | 94% | | 5/5 · 3/5 |
+
+`general` is also 97% on the older pairs and 94% on the 18 fresh ones (threshold picked
+on the older pairs only). Its 3 mistakes: cover letters marketing vs software (0.75),
+resumes nursing vs accounting (0.62), Chicago rentals vs Austin condos (0.26).
+
+### Before the team's labels
+
 Final run, 2026-10-24, `jev-latest`: 68 counted pairs across `match_pairs.json` (24),
 `holdout_pairs.json` (12) and `extra_pairs.json` (32, 5 more marked `unsure` and not
 counted), plus 5 ranking groups (one person vs 5 candidates in one request, like

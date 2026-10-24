@@ -1,7 +1,7 @@
 {
   "about": "More pairs: borderline cases (where the threshold is decided), summaries in the summarizer's real style (docs/activity-capture.md: <= 120 chars, its topic labels, some vague), and subjects outside computer science. unsure = a genuine judgment call; reported but not counted in accuracy.",
   "pairs": [
-    {"id": "interview-coding-vs-behavioral", "kind": "borderline: same goal, different area", "match": true,
+    {"id": "interview-coding-vs-behavioral", "kind": "borderline: same goal, different area", "match": true, "unsure": true, "label_note": "depends on the user's filters",
      "a": {"topic": "LeetCode", "task_summary": "Practicing coding interview questions on binary trees"},
      "b": {"topic": "Job hunting", "task_summary": "Rehearsing behavioral interview answers for software internships"}},
     {"id": "cs170-midterm-vs-homework", "kind": "borderline: same course, different topic", "match": true,
@@ -47,7 +47,7 @@
     {"id": "style-swe-vs-data-analyst", "kind": "summarizer style, adjacent field", "match": false, "unsure": true,
      "a": {"topic": "Job hunting", "task_summary": "Applying to software engineering internships"},
      "b": {"topic": "Job hunting", "task_summary": "Updating a resume for data analyst roles"}},
-    {"id": "style-berkeley-vs-oakland", "kind": "summarizer style, neighboring cities", "match": true, "unsure": true,
+    {"id": "style-berkeley-vs-oakland", "kind": "summarizer style, neighboring cities", "match": true, "label_note": "team: same search in a different place is a match",
      "a": {"topic": "Apartment hunting", "task_summary": "Browsing rental listings in Berkeley"},
      "b": {"topic": "Apartment hunting", "task_summary": "Comparing studio apartments in Oakland"}},
     {"id": "style-figma-login-vs-landing", "kind": "summarizer style", "match": true,
@@ -111,7 +111,7 @@
     {"id": "blender-vs-chem-quiz", "kind": "new subject, unrelated", "match": false,
      "a": {"topic": "3D modeling", "task_summary": "Modeling a game character in Blender"},
      "b": {"topic": "Studying", "task_summary": "Studying for a chemistry quiz"}},
-    {"id": "law-contracts-vs-torts", "kind": "new subject, same program", "match": true,
+    {"id": "law-contracts-vs-torts", "kind": "new subject, same program", "match": true, "unsure": true, "label_note": "depends on the user's filters",
      "a": {"topic": "Coursework", "task_summary": "Briefing contract law cases for a 1L class"},
      "b": {"topic": "Studying", "task_summary": "Outlining torts for a law school final"}}
   ]
