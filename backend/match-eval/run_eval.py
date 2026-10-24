@@ -161,9 +161,10 @@ def main() -> None:
     parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict")
     parser.add_argument("--threshold", type=float, default=float(os.environ.get("MATCH_THRESHOLD", "0.8")))
     parser.add_argument("--json", help="also write full results here")
+    parser.add_argument("--pairs", default="match_pairs.json", help="pairs file (holdout_pairs.json for the held-out check)")
     args = parser.parse_args()
 
-    pairs = json.loads((HERE / "match_pairs.json").read_text())["pairs"]
+    pairs = json.loads((HERE / args.pairs).read_text())["pairs"]
     print(f"{len(pairs)} pairs ({sum(p['match'] for p in pairs)} should match), threshold {args.threshold}\n")
 
     if args.offline:

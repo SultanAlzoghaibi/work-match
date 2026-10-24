@@ -29,6 +29,21 @@ label, different subject or city) and plain unrelated pairs.
 
 ## Results
 
-| Variant | Accuracy at 0.8 | Best threshold | Notes |
-|---|---|---|---|
-| word overlap (no AI) | 50% | 71% at 0.25 | Misses every cross-app and different-wording pair |
+Run 2026-10-24 with `jev-latest`. First number: `match_pairs.json` (24). Second:
+`holdout_pairs.json` (12 pairs on subjects no variant mentions).
+
+| Variant | Right at 0.8 | Best threshold | Highest non-match | Lowest match |
+|---|---|---|---|---|
+| word overlap (no AI) | 50% | 71% at 0.25 | 0.29 | 0.00 |
+| `current` | 75% / 58% | 96% at 0.60 / 92% at 0.60 | 0.58 / 0.48 | 0.38 / 0.32 |
+| `with-topic` | 83% / 67% | 92% at 0.70 / 83% at 0.50 | 0.67 / 0.73 | 0.43 / 0.32 |
+| `strict` | 88% / 75% | 100% at 0.45 / 100% at 0.35 | 0.06 / 0.14 | 0.45 / 0.37 |
+| `topic+strict` | 88% / 83% | 100% at 0.45 / 100% at 0.45 | 0.08 / 0.14 | 0.47 / 0.46 |
+
+Takeaways:
+- A 0.8 threshold misses real matches with every variant (half of them on the held-out set with `current`).
+- `current` can't separate the groups: some non-matches score above some matches.
+- `strict` / `topic+strict` leave a wide gap (non-matches ≤ ~0.14, matches ≥ ~0.46) that holds on
+  the held-out subjects. Suggested: `topic+strict` with a threshold around 0.3.
+- Caveat: 36 pairs, labelled by us, and the `strict` criteria's examples overlap with
+  `match_pairs.json`; the held-out set is the fairer check.
