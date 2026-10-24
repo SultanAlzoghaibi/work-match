@@ -109,6 +109,7 @@ async function pushNow() {
   const note = (text) => {
     if (taskUi.pushNote) taskUi.pushNote.textContent = text;
   };
+  await ensureSharing().catch((err) => console.warn("couldn't turn sharing on", err));
   if (session) {
     if (session.pushing) return;
     session.nextPushAt = 0;
@@ -132,7 +133,18 @@ async function pushNow() {
   }
 }
 
-function startSession(kind, filters) {
+/// Searching means you want to be matched: turn Sharing on (locally and on
+/// the server) if it's off, so the backend doesn't skip you as "not sharing".
+async function ensureSharing() {
+  const profile = await loadProfile();
+  if (!profile || profile.sharing_enabled) return;
+  const shared = { ...profile, sharing_enabled: 1 };
+  await saveProfile(shared);
+  await updateUser(MOCK_USER_ID, shared).catch((err) => console.warn("sharing sync failed", err));
+}
+
+async function startSession(kind, filters) {
+  await ensureSharing().catch((err) => console.warn("couldn't turn sharing on", err));
   const task = MOCK_TASKS[kind];
   session = {
     kind,
@@ -806,11 +818,23 @@ function renderEdit(profile) {
 
 // --- Entry ------------------------------------------------------------------
 
+/// The local profile is the source of truth: copy it to the server once per
+/// app start, so the backend's sharing flag, name and filters inputs (age,
+/// country, languages) can't drift from what the app shows.
+let profileSynced = false;
+
 async function render() {
   try {
     const profile = await loadProfile();
-    if (profile?.token) renderProfile(profile);
-    else renderLogin();
+    if (profile?.token) {
+      if (!profileSynced) {
+        profileSynced = true;
+        updateUser(MOCK_USER_ID, profile).catch((err) => console.warn("profile sync failed", err));
+      }
+      renderProfile(profile);
+    } else {
+      renderLogin();
+    }
   } catch (err) {
     renderError(err);
   }
