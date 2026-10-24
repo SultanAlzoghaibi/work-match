@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import secrets
 from uuid import UUID
 
 import httpx
@@ -15,11 +18,14 @@ from .matching import (
 )
 from .storage import upload_avatar
 from .schemas import (
+    AuthResponse,
     Connection,
     CurrTask,
     KeepBody,
+    LoginBody,
     MatchView,
     RespondBody,
+    SignupBody,
     Filters,
     TaskHistoryItem,
     TaskPush,
@@ -53,6 +59,52 @@ def health() -> dict:
     with connect() as conn:
         conn.execute("select 1")
     return {"ok": True}
+
+
+# --- Sign-up / log-in --------------------------------------------------------
+# Username + password, hashed with scrypt. The returned token is what the app
+# stores to stay signed in; the other endpoints don't check it yet (see the
+# TODO on update_user).
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1)
+    return f"scrypt${salt.hex()}${digest.hex()}"
+
+
+def _check_password(password: str, stored: str | None) -> bool:
+    if not stored or not stored.startswith("scrypt$"):
+        return False
+    _, salt, digest = stored.split("$")
+    candidate = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=2**14, r=8, p=1)
+    return hmac.compare_digest(candidate.hex(), digest)
+
+
+@app.post("/auth/signup", response_model=AuthResponse, status_code=201)
+def signup(body: SignupBody) -> dict:
+    username = body.username.lower()
+    token = secrets.token_urlsafe(32)
+    query = sql.SQL(
+        "insert into users (token, name, username, password_hash) values (%s, %s, %s, %s) returning {}"
+    ).format(USER_COLUMNS)
+    try:
+        with connect() as conn:
+            row = conn.execute(query, (token, body.name or body.username, username, _hash_password(body.password))).fetchone()
+    except errors.UniqueViolation:
+        raise HTTPException(409, "that username is taken")
+    return {"user": row, "token": token}
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+def login(body: LoginBody) -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            sql.SQL("select {}, token, password_hash from users where username = %s").format(USER_COLUMNS),
+            (body.username.lower(),),
+        ).fetchone()
+    if row is None or not _check_password(body.password, row.pop("password_hash")):
+        raise HTTPException(401, "wrong username or password")
+    return {"user": row, "token": row.pop("token")}
 
 
 @app.get("/users/{user_id}", response_model=User)
@@ -309,6 +361,21 @@ def get_active_connections(user_id: UUID) -> list[dict]:
 def get_connections(user_id: UUID) -> list[dict]:
     with connect() as conn:
         return list_connections(conn, user_id)
+
+
+# REMOVE A FRIEND: deletes the shared connection row, so it's gone for both
+# people (the other app drops it on its next ~3 s poll). They can be matched
+# again on that topic later, like strangers.
+@app.delete("/users/{user_id}/connections/{connection_id}", status_code=204)
+def delete_connection(user_id: UUID, connection_id: int) -> None:
+    with connect() as conn:
+        conn.execute("delete from is_working_on_connections where connection_id = %s", (connection_id,))
+        deleted = conn.execute(
+            "delete from connections where id = %s and %s in (user_a, user_b) returning id",
+            (connection_id, user_id),
+        ).fetchone()
+        if deleted is None:
+            raise HTTPException(404, "connection not found")
 
 
 # JOIN A FRIEND: clicking an active friend starts a match with them on the

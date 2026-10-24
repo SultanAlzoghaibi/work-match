@@ -1,8 +1,7 @@
 import { getDb } from "./db.js";
-import { MOCK_USER_ID } from "./api.js";
 
-/// Demo names: instance 1 (yarn dev1) is sultan1, instance 2 (yarn dev2) is James2.
-export const DEFAULT_NAME = MOCK_USER_ID.endsWith("1") ? "James2" : "sultan1";
+/// Shown when a profile has no name yet.
+export const DEFAULT_NAME = "New User";
 
 // The single curr_user_profile row (id = 1). token NULL = signed out.
 export const PROFILE_FIELDS = ["name", "school", "career", "bio", "age_group", "country", "discord_handle", "languages"];
@@ -29,28 +28,34 @@ export const AGE_GROUPS = [
 
 export async function loadProfile() {
   const db = await getDb();
-  // Rename profiles left over from before the demo names existed.
-  await db.execute("UPDATE curr_user_profile SET name = $1 WHERE id = 1 AND name LIKE 'New User%'", [DEFAULT_NAME]);
   const rows = await db.select("SELECT * FROM curr_user_profile WHERE id = 1");
   return rows[0] ?? null;
 }
 
-/// Mock sign-in: always succeeds. Hands out a fake token and keeps any
-/// profile already on this device. Swap for POST /users once the backend exists.
-export async function mockLogin() {
+/// After sign-up / log-in: remember the session on this Mac and take the
+/// profile from the server, so switching accounts never mixes two people.
+export async function saveSession({ user, token }, username) {
   const db = await getDb();
-  const token = `mock-${crypto.randomUUID()}`;
   await db.execute(
-    `INSERT INTO curr_user_profile (id, token, name) VALUES (1, $1, $2)
-     ON CONFLICT (id) DO UPDATE SET token = $1,
-       name = CASE WHEN name IS NULL OR name LIKE 'New User%' THEN $2 ELSE name END`,
-    [token, DEFAULT_NAME],
+    `INSERT OR IGNORE INTO curr_user_profile (id) VALUES (1)`,
+  );
+  await db.execute(
+    `UPDATE curr_user_profile SET token = $1, user_id = $2, username = $3, name = $4, school = $5,
+       career = $6, bio = $7, age_group = $8, country = $9, discord_handle = $10, avatar_url = $11,
+       languages = $12, sharing_enabled = $13
+     WHERE id = 1`,
+    [
+      token, user.id, username.toLowerCase(), user.name, user.school, user.career, user.bio,
+      user.age_group, user.country, user.discord_handle, user.avatar_url,
+      (user.languages ?? []).join(", ") || null, user.sharing_enabled ? 1 : 0,
+    ],
   );
 }
 
+/// Sign out on this Mac. username stays so the login form can say "welcome back".
 export async function logout() {
   const db = await getDb();
-  await db.execute("UPDATE curr_user_profile SET token = NULL WHERE id = 1");
+  await db.execute("UPDATE curr_user_profile SET token = NULL, user_id = NULL WHERE id = 1");
 }
 
 export async function saveProfile(profile) {

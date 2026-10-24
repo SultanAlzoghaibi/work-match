@@ -3,11 +3,11 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/700.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { API_URL, MOCK_USER_ID, clearTask, getFilters, pushTask, saveFilters, updateUser, uploadAvatar } from "./api.js";
+import { API_URL, clearTask, login, setUserId, signup, userId, deleteConnection, getFilters, pushTask, saveFilters, updateUser, uploadAvatar } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { renderDevTab } from "./devTab.js";
 import { SCHOOLS } from "./schools.js";
-import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logout, mockLogin, resizeImage, saveAvatarUrl, saveProfile } from "./profile.js";
+import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logout, resizeImage, saveSession, saveAvatarUrl, saveProfile } from "./profile.js";
 
 // Same idea as TyA's getOs(): ask Rust for the target OS instead of sniffing
 // the user agent. macOS gets native liquid glass, so the page stays clear;
@@ -15,8 +15,25 @@ import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logou
 const os = await invoke("os_name").catch(() => "unknown");
 document.documentElement.classList.add(os === "macos" ? "os-macos" : "os-other");
 
-// Rust polls GET /users/{id}/poll every 3 s and shows the match popup.
-invoke("start_match_polling", { userId: MOCK_USER_ID, apiUrl: API_URL }).catch(console.error);
+// Rust polls GET /users/{id}/poll every 3 s and shows the match popup. Starts
+// once someone is signed in (see render).
+
+/// Per-device memory for "continue where you left off": last tab and whether
+/// friend finding was on. localStorage can be unavailable, so never rely on it.
+const remember = {
+  get(key) {
+    try {
+      return localStorage.getItem(`wm-${key}`);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(`wm-${key}`, value);
+    } catch {}
+  },
+};
 
 const root = document.getElementById("root");
 
@@ -34,7 +51,7 @@ document.addEventListener("keydown", (event) => {
 async function quitApp() {
   if (session) {
     session = null;
-    await clearTask(MOCK_USER_ID).catch(() => {});
+    await clearTask(userId()).catch(() => {});
   }
   invoke("quit_app");
 }
@@ -74,6 +91,7 @@ function friendFindingButton() {
 
 listen("friend-finding", (event) => {
   friendFinding = event.payload;
+  remember.set("friend-finding", friendFinding ? "1" : "0");
   paintTitlebarStatus();
   for (const button of friendButtons) {
     if (button.isConnected) paintFriendButton(button);
@@ -122,7 +140,7 @@ function updateSummaryCard() {
   if (!latestSummary) {
     card.replaceChildren(
       el("h3", { class: "section-title" }, "Your summary"),
-      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Pick a task above, or turn on sharing and press ⚡ Push now to summarize your real activity."),
+      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Turn on sharing and press ⚡ Push now in the Dev tab, or pick a demo task there."),
     );
     return;
   }
@@ -194,7 +212,7 @@ async function setSharing(on) {
   await invoke("set_sharing", { enabled: on }).catch((err) => console.warn("set_sharing failed", err));
   const profile = await loadProfile();
   if (profile) {
-    await updateUser(MOCK_USER_ID, { ...profile, sharing_enabled: on }).catch((err) => console.warn("sharing sync failed", err));
+    await updateUser(userId(), { ...profile, sharing_enabled: on }).catch((err) => console.warn("sharing sync failed", err));
   }
 }
 
@@ -224,7 +242,7 @@ async function endSession(message) {
   if (friendFinding) invoke("set_friend_finding", { enabled: false }).catch(console.error);
   lastPush = { ended: message };
   try {
-    await clearTask(MOCK_USER_ID);
+    await clearTask(userId());
   } catch (err) {
     lastPush = { error: `Couldn't remove the task: ${err.message}` };
   }
@@ -240,7 +258,7 @@ async function tickSession() {
     current.nextPushAt = now + PUSH_EVERY_MS;
     current.summary = randomSummary(current.kind, current.summary);
     try {
-      const saved = await pushTask(MOCK_USER_ID, current.summary, current.topic, current.filters);
+      const saved = await pushTask(userId(), current.summary, current.topic, current.filters);
       if (session === current) {
         lastPush = { summary: saved.task_summary, topic: saved.topic, match: saved.match };
         setLatestSummary({
@@ -358,7 +376,6 @@ function renderTaskDemo() {
       "div",
       { class: "task-buttons" },
       ...buttons,
-      el("button", { class: "primary", title: "Push now instead of waiting for the 5-minute timer", onclick: pushNow }, "⚡ Push now"),
       taskUi.stopButton,
     ),
     taskUi.pushNote,
@@ -397,8 +414,29 @@ async function joinFriend(connection) {
   }
 }
 
+/// Connection id whose Remove was clicked once; a second click removes it.
+let confirmingRemove = null;
+
+async function removeFriend(connection) {
+  if (confirmingRemove !== connection.connection_id) {
+    confirmingRemove = connection.connection_id;
+    updateFriendsList();
+    return;
+  }
+  confirmingRemove = null;
+  try {
+    await deleteConnection(userId(), connection.connection_id);
+    connections = connections.filter((other) => other.connection_id !== connection.connection_id);
+    friendsUi.status.textContent = `Removed ${connection.friend.name} (for both of you).`;
+  } catch (err) {
+    friendsUi.status.textContent = `Couldn't remove: ${err.message ?? err}`;
+  }
+  updateFriendsList();
+}
+
 function friendRow(connection) {
   const { friend, topic, active } = connection;
+  const confirming = confirmingRemove === connection.connection_id;
   return el(
     "div",
     { class: active ? "friend online" : "friend offline" },
@@ -413,6 +451,15 @@ function friendRow(connection) {
     active
       ? el("button", { class: "primary", onclick: () => joinFriend(connection) }, "Work together")
       : null,
+    el(
+      "button",
+      {
+        class: confirming ? "secondary danger" : "link",
+        title: "Remove this work friend for both of you",
+        onclick: () => removeFriend(connection),
+      },
+      confirming ? "Remove for both?" : "Remove",
+    ),
   );
 }
 
@@ -482,19 +529,98 @@ function renderError(err) {
 
 // --- Login (mock) -----------------------------------------------------------
 
-function renderLogin() {
+/// Username + password. A returning user (username kept after logout) lands on
+/// "Log in" with the name filled in; everyone else starts on "Sign up".
+function renderLogin(lastUsername) {
   paintTitlebarUser(null);
-  const continueButton = el(
-    "button",
+  let mode = lastUsername ? "login" : "signup";
+  const username = el("input", {
+    name: "username",
+    autocomplete: "username",
+    placeholder: "Username",
+    required: "",
+    minlength: "3",
+    maxlength: "30",
+    pattern: "[A-Za-z0-9_.\\-]+",
+    title: "Letters, numbers, _ . -",
+    autocapitalize: "off",
+    spellcheck: "false",
+  });
+  username.value = lastUsername ?? "";
+  const password = el("input", {
+    name: "password",
+    type: "password",
+    placeholder: "Password (6+ characters)",
+    required: "",
+    minlength: "6",
+  });
+  const error = el("p", { class: "error" });
+  const submit = el("button", { type: "submit", class: "primary" });
+  const swap = el("button", { type: "button", class: "link" });
+  const heading = el("p", { class: "tagline" });
+
+  const paint = () => {
+    password.autocomplete = mode === "login" ? "current-password" : "new-password";
+    submit.textContent = mode === "login" ? "Log in" : "Create account";
+    swap.textContent = mode === "login" ? "New here? Sign up" : "Have an account? Log in";
+    heading.textContent =
+      mode === "login" && lastUsername
+        ? `Welcome back, ${lastUsername}. Pick up where you left off.`
+        : "Find someone working on the same thing, right now.";
+  };
+  swap.addEventListener("click", () => {
+    mode = mode === "login" ? "signup" : "login";
+    error.textContent = "";
+    paint();
+  });
+  paint();
+
+  const form = el(
+    "form",
     {
-      class: "primary",
-      onclick: async () => {
-        continueButton.disabled = true;
-        await mockLogin().catch(renderError);
-        await render();
+      class: "auth",
+      onsubmit: async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
+        error.textContent = "";
+        const name = username.value.trim();
+        try {
+          const session = mode === "login" ? await login(name, password.value) : await signup(name, password.value);
+          await saveSession(session, name);
+          await render();
+        } catch (err) {
+          error.textContent = err.message.replace(/^\d+ /, "");
+          submit.disabled = false;
+        }
       },
     },
-    "Continue",
+    username,
+    password,
+    error,
+    submit,
+    swap,
+  );
+  // Skip: a throwaway guest account, so judges can try it in one click. The
+  // session is saved like any other, so relaunching continues as the guest.
+  const skip = el(
+    "button",
+    {
+      type: "button",
+      class: "secondary skip",
+      onclick: async () => {
+        skip.disabled = true;
+        error.textContent = "";
+        const guest = `guest-${crypto.randomUUID().slice(0, 8)}`;
+        try {
+          await saveSession(await signup(guest, crypto.randomUUID()), guest);
+          await render();
+        } catch (err) {
+          error.textContent = err.message.replace(/^\d+ /, "");
+          skip.disabled = false;
+        }
+      },
+    },
+    "Skip, try it as a guest",
   );
   show(
     el(
@@ -505,11 +631,24 @@ function renderLogin() {
       el("div", { class: "sticker mint" }, "✓"),
       el("div", { class: "sticker ember" }, "★"),
       el("h1", { class: "display" }, "Work", el("br"), "Match"),
-      el("p", { class: "tagline" }, "Find someone working on the same thing, right now."),
-      continueButton,
-      el("p", { class: "fine" }, "Mock sign-in for the demo: no account needed."),
+      heading,
+      form,
+      skip,
     ),
   );
+  (lastUsername ? password : username).focus();
+}
+
+/// Log out: stop being matchable, stop polling, turn friend finding off.
+async function signOut() {
+  if (session) session = null;
+  await clearTask(userId()).catch(() => {});
+  await invoke("stop_match_polling").catch(() => {});
+  if (friendFinding) await invoke("set_friend_finding", { enabled: false }).catch(() => {});
+  setUserId(null);
+  profileSynced = false;
+  await logout();
+  await render();
 }
 
 // --- Profile view -----------------------------------------------------------
@@ -524,7 +663,7 @@ async function saveAndSync(data) {
   try {
     await saveProfile(data);
     try {
-      await updateUser(MOCK_USER_ID, data);
+      await updateUser(userId(), data);
       syncStatus = { ok: true, text: "Saved to the server." };
     } catch (err) {
       syncStatus = { ok: false, text: `Saved on this Mac only. Server: ${err.message}` };
@@ -614,7 +753,7 @@ function paintTitlebarUser(profile) {
 /// Matching is mutual: a pair only matches if both people's filters allow it.
 function renderFiltersTab(profile) {
   const body = el("div", { class: "tab-body filters" }, el("p", { class: "muted" }, "Loading your filters…"));
-  getFilters(MOCK_USER_ID)
+  getFilters(userId())
     .then((filters) => body.replaceChildren(filtersForm(profile, filters)))
     .catch((err) => body.replaceChildren(el("p", { class: "error" }, `Couldn't load filters: ${err.message}`)));
   return body;
@@ -659,7 +798,7 @@ function filtersForm(profile, filters) {
         status.className = "task-status";
         status.textContent = "Saving…";
         try {
-          await saveFilters(MOCK_USER_ID, {
+          await saveFilters(userId(), {
             age_groups: ageBoxes.map((chip) => chip.querySelector("input")).filter((box) => box.checked).map((box) => box.value),
             countries,
             shared_language: sharedLanguage.checked,
@@ -708,7 +847,7 @@ function filtersForm(profile, filters) {
 }
 
 /// Which main-window tab is showing; kept across re-renders (e.g. after Save).
-let activeTab = "friends";
+let activeTab = remember.get("tab") ?? "friends";
 
 function tabBar(profile) {
   const tab = (key, label) =>
@@ -718,6 +857,7 @@ function tabBar(profile) {
         class: activeTab === key ? "tab primary" : "tab secondary",
         onclick: () => {
           activeTab = key;
+          remember.set("tab", key);
           renderProfile(profile);
         },
       },
@@ -745,7 +885,7 @@ function renderProfile(profile) {
         : activeTab === "filters"
           ? renderFiltersTab(profile)
           : activeTab === "dev"
-            ? renderDevTab({ onPushNow: pushNow })
+            ? renderDevTab({ onPushNow: pushNow, top: renderTaskDemo() })
             : renderProfileTab(profile),
     ),
   );
@@ -758,7 +898,6 @@ function renderFriendsTab() {
     "div",
     { class: "tab-body" },
     friendFindingButton(),
-    renderTaskDemo(),
     (summaryUi.card = el("div", { class: "summary-card" })),
     renderFriends(),
     // Demo only: raise the liquid glass match popup with mock data.
@@ -816,7 +955,7 @@ function renderProfileTab(profile) {
         el(
           "div",
           {},
-          el("button", { class: "link", onclick: () => logout().then(render, renderError) }, "Log out"),
+          el("button", { class: "link", onclick: () => signOut().catch(renderError) }, "Log out"),
           el("button", { class: "link", title: "Quit work-match (⌘Q)", onclick: quitApp }, "Quit"),
         ),
         el("button", { class: "primary", onclick: () => renderEdit(profile) }, "Edit"),
@@ -842,7 +981,7 @@ function renderEdit(profile) {
     const file = photoInput.files[0];
     if (!file) return;
     try {
-      const user = await uploadAvatar(MOCK_USER_ID, await resizeImage(file));
+      const user = await uploadAvatar(userId(), await resizeImage(file));
       await saveAvatarUrl(user.avatar_url);
       syncStatus = { ok: true, text: "Photo updated." };
     } catch (err) {
@@ -906,17 +1045,86 @@ function renderEdit(profile) {
 /// country, languages) can't drift from what the app shows.
 let profileSynced = false;
 
+// --- Match profile ("Learn more" in the match popup) --------------------------
+
+const PERSON_AGE = Object.fromEntries(AGE_GROUPS);
+
+/// Full profile of the person you just matched with. Read-only; Back returns
+/// to your own views.
+function renderPerson({ other, topic, score }) {
+  if (!other) return;
+  show(
+    el(
+      "section",
+      { class: "app" },
+      el("div", { class: "tabs" }, el("button", { class: "tab secondary", onclick: render }, "← Back")),
+      el(
+        "div",
+        { class: "tab-body profile person" },
+        el(
+          "header",
+          {},
+          avatar(other),
+          el("div", { class: "sticker mint" }, "🤝"),
+          el(
+            "div",
+            { class: "who" },
+            el("h2", {}, other.name || "Someone"),
+            el("p", { class: "muted" }, [other.career, other.school].filter(Boolean).join(" · ") || "No details yet"),
+          ),
+        ),
+        topic
+          ? el(
+              "div",
+              { class: "person-match" },
+              el("span", { class: "label" }, "You match on"),
+              el("strong", {}, topic),
+              score != null ? el("span", { class: "muted" }, `${Math.round(score * 100)}% match`) : null,
+            )
+          : null,
+        other.bio ? el("div", { class: "person-block" }, el("span", { class: "label" }, "Bio"), el("p", {}, other.bio)) : null,
+        other.task_summary
+          ? el("div", { class: "person-block" }, el("span", { class: "label" }, "Working on right now"), el("p", {}, other.task_summary))
+          : null,
+        el(
+          "div",
+          { class: "details" },
+          detailRow("School", other.school),
+          detailRow("Career", other.career),
+          detailRow("Age group", PERSON_AGE[other.age_group]),
+          detailRow("Country", other.country),
+          detailRow("Discord", other.discord_handle),
+        ),
+      ),
+    ),
+  );
+}
+
+listen("show-person", (event) => renderPerson(event.payload));
+
+/// Once per sign-in (or app launch while signed in): point everything at this
+/// user and pick up where they left off.
+function resumeSession(profile) {
+  setUserId(profile.user_id);
+  invoke("start_match_polling", { userId: profile.user_id, apiUrl: API_URL }).catch(console.error);
+  updateUser(profile.user_id, profile).catch((err) => console.warn("profile sync failed", err));
+  if (remember.get("friend-finding") === "1" && !friendFinding) {
+    invoke("set_friend_finding", { enabled: true }).catch(console.error);
+  }
+}
+
 async function render() {
   try {
     const profile = await loadProfile();
-    if (profile?.token) {
+    // Needs both: sessions from the old mock sign-in have a token but no user_id.
+    if (profile?.token && profile.user_id) {
       if (!profileSynced) {
         profileSynced = true;
-        updateUser(MOCK_USER_ID, profile).catch((err) => console.warn("profile sync failed", err));
+        resumeSession(profile);
       }
       renderProfile(profile);
     } else {
-      renderLogin();
+      renderLogin(profile?.username);
     }
   } catch (err) {
     renderError(err);

@@ -4,10 +4,13 @@
 // Vercel redirects (308) and breaks POST / PATCH from the app.
 export const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 
-/// Hard-coded user until real sign-up exists. Seeded by backend/seed.sql.
-/// Instance 2 (yarn dev2) sets VITE_USER_ID to ...0001 so the two apps are
-/// two different people.
-export const MOCK_USER_ID = import.meta.env.VITE_USER_ID ?? "00000000-0000-0000-0000-000000000000";
+/// The signed-in user's backend id (users.id). Set from the saved session on
+/// launch, or by sign-up / log-in; null while signed out.
+let currentUserId = null;
+export const userId = () => currentUserId;
+export function setUserId(id) {
+  currentUserId = id;
+}
 
 async function request(method, path, body) {
   const response = await fetch(`${API_URL}${path}`, {
@@ -81,4 +84,19 @@ export function clearTask(userId) {
 /// GET /users/{id}/task-history: past pushes, newest first (Dev tab).
 export function getTaskHistory(userId, limit = 20) {
   return request("GET", `/users/${userId}/task-history?limit=${limit}`);
+}
+
+/// Remove a work friend: deletes the connection for both people.
+export function deleteConnection(userId, connectionId) {
+  return request("DELETE", `/users/${userId}/connections/${connectionId}`);
+}
+
+/// POST /auth/signup: new account. Returns { user, token }; 409 = name taken.
+export function signup(username, password) {
+  return request("POST", "/auth/signup", { username, password });
+}
+
+/// POST /auth/login. Returns { user, token }; 401 = wrong username or password.
+export function login(username, password) {
+  return request("POST", "/auth/login", { username, password });
 }

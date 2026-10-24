@@ -204,27 +204,45 @@ function render(view) {
         error.textContent = String(err);
       }
     };
-    const meta = [other.school, other.bio].filter(Boolean).join(" · ");
     show(
-      el("div", { class: "eyebrow" }, "🌍 Match found"),
-      el(
-        "p",
-        { class: "intro" },
-        el("strong", {}, name),
-        ` is also working on ${view.topic} right now. Want to work alongside them?`,
-      ),
-      meta ? el("p", { class: "meta" }, meta) : null,
-      el("p", { class: "task" }, other.task_summary ?? ""),
-      view.their_status === "accepted" ? el("p", { class: "meta" }, `${name} already accepted.`) : null,
+      el("div", { class: "eyebrow big" }, "You guys match!"),
+      el("p", { class: "intro" }, "Both working on ", el("strong", {}, view.topic), " right now."),
+      view.their_status === "accepted" ? el("p", { class: "meta" }, `${name} already said yes.`) : null,
       error,
       el(
         "div",
-        { class: "actions" },
-        el("button", { class: "secondary", onclick: () => respond(false) }, "Not now"),
-        el("button", { class: "primary", onclick: () => respond(true) }, "Work together"),
+        { class: "choice" },
+        el("button", { class: "round no", title: "Not now", onclick: () => respond(false) }, "✕"),
+        el("button", { class: "round yes", title: "Work together", onclick: () => respond(true) }, "✓"),
       ),
+      profilePreview(other),
     );
   }
+}
+
+/// Compact profile under the ✕/✓ choice; "Learn more" opens the full one in
+/// the main window.
+function profilePreview(other) {
+  const initial = (other.name || "?").trim().charAt(0).toUpperCase();
+  const sub = [other.career, other.school].filter(Boolean).join(" · ");
+  return el(
+    "div",
+    { class: "card preview" },
+    el(
+      "div",
+      { class: "preview-head" },
+      other.avatar_url
+        ? el("img", { class: "card-avatar", src: other.avatar_url, alt: "" })
+        : el("div", { class: "card-avatar initial" }, initial),
+      el("div", {}, el("div", { class: "card-name" }, other.name), sub ? el("div", { class: "meta" }, sub) : null),
+    ),
+    other.bio ? el("p", { class: "bio" }, other.bio) : null,
+    el(
+      "button",
+      { class: "link", onclick: () => invoke("open_match_profile").catch(console.error) },
+      "Learn more →",
+    ),
+  );
 }
 
 await listen("match-state", (event) => render(event.payload));

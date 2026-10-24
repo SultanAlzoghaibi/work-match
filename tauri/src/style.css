@@ -275,7 +275,7 @@ footer {
 }
 
 .login .display {
-  font-size: 88px;
+  font-size: 72px;
 }
 
 .login .tagline {
@@ -285,8 +285,23 @@ footer {
 }
 
 .login button.primary {
-  margin-top: 8px;
-  min-width: 220px;
+  margin-top: 4px;
+}
+
+/* Sign up / log in form under the wordmark. */
+.login .auth {
+  flex: none;
+  width: 280px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login .skip {
+  width: 280px;
+}
+
+.login .auth .error:empty {
+  display: none;
 }
 
 .login .sticker:nth-of-type(1) { width: 64px; height: 64px; top: 8%; left: 6%; transform: rotate(-12deg); font-size: 34px; }
@@ -734,6 +749,12 @@ input[type="checkbox"]:checked::after {
   gap: 14px;
 }
 
+.dev-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .dev-section {
   padding: 14px 16px;
   border: var(--outline);
@@ -859,4 +880,40 @@ input[type="checkbox"]:checked::after {
   cursor: pointer;
   font-size: var(--text-caption);
   font-weight: 700;
+}
+
+/* --- Match profile ("Learn more") ------------------------------------------ */
+
+.person-match {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  background: var(--color-lavender);
+}
+
+.person-match .muted {
+  margin-left: auto;
+}
+
+.person-block {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: var(--outline);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-white);
+}
+
+.person-block p {
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+/* Work friends: "Remove for both?" (second click deletes the connection). */
+button.secondary.danger {
+  background: var(--color-ember);
+  color: var(--color-paper-white);
 }

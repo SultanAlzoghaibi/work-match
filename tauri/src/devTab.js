@@ -2,7 +2,7 @@
 // what the summarizer read and returned, and what was pushed. Read-only;
 // refreshes every 3 s while it's open.
 import { invoke } from "@tauri-apps/api/core";
-import { API_URL, MOCK_USER_ID, getTaskHistory } from "./api.js";
+import { API_URL, getTaskHistory, userId } from "./api.js";
 
 const REFRESH_MS = 3000;
 const WINDOW_MINUTES = 15;
@@ -97,7 +97,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
       "Next 5-min summary",
       status.next_summary_at ? `in ${duration(status.next_summary_at - now)} (${shortClock(status.next_summary_at)})` : "not scheduled",
     ),
-    check(backendOk, "Backend", `${API_URL} · user ${MOCK_USER_ID}`),
+    check(backendOk, "Backend", `${API_URL} · user ${userId()}`),
     el(
       "div",
       { class: "dev-actions" },
@@ -232,9 +232,10 @@ function historySection(history) {
 
 // --- Tab --------------------------------------------------------------------------
 
-/// Builds the Dev tab and keeps it fresh while it's in the document.
-export function renderDevTab({ onPushNow }) {
-  const body = el("div", { class: "tab-body dev" }, el("p", { class: "muted" }, "Loading…"));
+/// Builds the Dev tab and keeps it fresh while it's in the document. `top`
+/// (the demo task buttons) sits above the sections and isn't re-rendered.
+export function renderDevTab({ onPushNow, top }) {
+  const body = el("div", { class: "dev-sections" }, el("p", { class: "muted" }, "Loading…"));
   let timer = null;
   // Server data (~1 s per call) is fetched in the background and shown on the
   // next render, so the local sections never wait for it.
@@ -246,7 +247,7 @@ export function renderDevTab({ onPushNow }) {
     if (serverBusy) return;
     serverBusy = true;
     Promise.all([
-      getTaskHistory(MOCK_USER_ID, 15).catch(() => null),
+      getTaskHistory(userId(), 15).catch(() => null),
       fetch(`${API_URL}/health`).then((response) => response.ok, () => false),
     ]).then(([nextHistory, nextOk]) => {
       history = nextHistory;
@@ -290,5 +291,5 @@ export function renderDevTab({ onPushNow }) {
     refresh().catch(() => {});
     refreshServer();
   }, REFRESH_MS);
-  return body;
+  return el("div", { class: "tab-body dev" }, top, body);
 }

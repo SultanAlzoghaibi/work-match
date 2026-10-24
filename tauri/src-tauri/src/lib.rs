@@ -73,6 +73,12 @@ pub fn run() {
             sql: include_str!("migrations/006_languages.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "auth",
+            sql: include_str!("migrations/007_auth.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     let builder = tauri::Builder::default()
@@ -195,7 +201,9 @@ pub fn run() {
             match_popup::current_match,
             match_popup::respond_match,
             match_popup::dismiss_match,
+            match_popup::open_match_profile,
             match_popup::start_match_polling,
+            match_popup::stop_match_polling,
             match_popup::current_connections,
             match_popup::join_connection,
             match_popup::keep_match,

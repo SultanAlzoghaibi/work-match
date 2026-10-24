@@ -33,6 +33,8 @@ struct PollConfig {
 #[derive(Default)]
 pub struct MatchState {
     config: Mutex<Option<PollConfig>>,
+    /// The poll loop has been spawned; it idles while config is None.
+    polling: std::sync::atomic::AtomicBool,
     /// Latest GET /users/{id}/connections (work friends), passed through as-is.
     connections: Mutex<Option<serde_json::Value>>,
     /// The match the popup is showing (None = no popup).
@@ -131,14 +133,9 @@ pub fn backend_target<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<(String, 
 #[tauri::command]
 pub fn start_match_polling<R: Runtime>(app: tauri::AppHandle<R>, user_id: String, api_url: String) {
     let state = app.state::<MatchState>();
-    let already_running = state
-        .config
-        .lock()
-        .unwrap()
-        .replace(PollConfig { user_id, api_url })
-        .is_some();
-    if already_running {
-        return; // page reload: the loop picks up the new config
+    *state.config.lock().unwrap() = Some(PollConfig { user_id, api_url });
+    if state.polling.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return; // page reload or new sign-in: the loop picks up the new config
     }
 
     tauri::async_runtime::spawn(async move {
@@ -285,6 +282,32 @@ pub fn dismiss_match<R: Runtime>(app: tauri::AppHandle<R>, match_id: i64) {
     crate::window::hide_match_popup(&app);
 }
 
+/// Logout: the poll loop idles until the next sign-in, and any open popup closes.
+#[tauri::command]
+pub fn stop_match_polling<R: Runtime>(app: tauri::AppHandle<R>) {
+    let state = app.state::<MatchState>();
+    *state.config.lock().unwrap() = None;
+    *state.connections.lock().unwrap() = None;
+    *state.current.lock().unwrap() = None;
+    crate::window::hide_match_popup(&app);
+}
+
+/// "Learn more" in the popup: show the other person's full profile in the
+/// main window (the solid one, not the glass).
+#[tauri::command]
+pub fn open_match_profile<R: Runtime>(app: tauri::AppHandle<R>) {
+    let Some(view) = app.state::<MatchState>().current.lock().unwrap().clone() else {
+        return;
+    };
+    let person = serde_json::json!({
+        "other": view.rest.get("other"),
+        "topic": view.rest.get("topic"),
+        "score": view.rest.get("score"),
+    });
+    crate::window::open_main_window(&app);
+    let _ = app.emit_to(crate::MAIN_LABEL, "show-person", person);
+}
+
 /// The popup page asks for this on load, so a match raised before the page
 /// finished loading isn't lost.
 #[tauri::command]
@@ -307,6 +330,7 @@ fn mock_view(my_status: &str) -> MatchView {
             "id": null,
             "name": "Sara",
             "school": "University of Calgary",
+            "career": "Software engineering intern",
             "bio": "CS student, prepping for internship interviews",
             "age_group": "18_24",
             "country": "CA",

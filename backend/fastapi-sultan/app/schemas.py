@@ -62,6 +62,22 @@ class PushFilters(BaseModel):
     same_age_group: bool = False
 
 
+class LoginBody(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=6, max_length=200)
+
+
+class SignupBody(LoginBody):
+    name: str | None = Field(default=None, min_length=1, max_length=60)
+
+
+class AuthResponse(BaseModel):
+    """Sign-up / log-in result. The app keeps token to stay signed in."""
+
+    user: User
+    token: str
+
+
 class TaskPush(BaseModel):
     """What the app is working on now, summarized on the device."""
 

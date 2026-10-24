@@ -24,6 +24,8 @@
 create table users (
     id              uuid        primary key default gen_random_uuid(),   -- the app may also pick it
     token           text        not null unique,                 -- TODO: store a hash
+    username        text        unique,                          -- lowercase; sign-in name
+    password_hash   text,                                        -- scrypt$salt$hash
     name            text        not null,
     school          text,
     career          text,                                        -- e.g. 'Software engineer', 'CS student'
