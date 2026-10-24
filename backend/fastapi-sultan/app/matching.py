@@ -11,7 +11,14 @@ from . import jev
 
 
 def _threshold() -> float:
-    return float(os.environ.get("MATCH_THRESHOLD", "0.8"))
+    # Measured in backend/match-eval together with the criteria in jev.py.
+    return float(os.environ.get("MATCH_THRESHOLD", "0.45"))
+
+
+def _active_threshold() -> float:
+    # Friend lights (score_topics) ask a different question that match-eval
+    # doesn't cover, so they keep the old cutoff.
+    return float(os.environ.get("ACTIVE_TOPIC_THRESHOLD", "0.8"))
 
 
 def _match_cooldown_minutes() -> int:
@@ -27,7 +34,7 @@ def _match_cooldown_minutes() -> int:
 
 
 CANDIDATES_SQL = """
-select t.user_id, t.task_summary, u.name
+select t.user_id, t.task_summary, t.topic, u.name
 from curr_task t
 join users u on u.id = t.user_id
 join users me on me.id = %(me)s
@@ -111,7 +118,7 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
         return result
 
     try:
-        scores = jev.score_candidates(my_summary, candidates)
+        scores = jev.score_candidates(my_summary, candidates, my_topic=topic)
     except jev.JevError as err:
         result["skipped_reason"] = str(err)
         return result
@@ -148,7 +155,7 @@ def refresh_active_connections(conn, me: UUID, my_summary: str) -> list[dict]:
     """Light up my connections whose topic matches what I'm doing now.
 
     Rewrites my is_working_on_connections rows: a row per connection whose
-    topic Jev scores at or above MATCH_THRESHOLD, nothing for the rest (so
+    topic Jev scores at or above ACTIVE_TOPIC_THRESHOLD, nothing for the rest (so
     switching tasks turns the old light off). Returns [{topic, score}].
     """
     connections = conn.execute(
@@ -167,7 +174,7 @@ def refresh_active_connections(conn, me: UUID, my_summary: str) -> list[dict]:
         return []
 
     for row in connections:
-        if scores[row["topic"]] >= _threshold():
+        if scores[row["topic"]] >= _active_threshold():
             conn.execute(
                 "insert into is_working_on_connections (connection_id, user_id) values (%s, %s)",
                 (row["id"], me),

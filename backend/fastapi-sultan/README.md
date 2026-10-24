@@ -34,7 +34,8 @@ After each push:
 | `.env` | Default | |
 |---|---|---|
 | `JEV_API` | (required) | TypeSafe Jev key; check it with `.venv/bin/python test_jev.py` |
-| `MATCH_THRESHOLD` | `0.8` | Minimum Jev score to create a match |
+| `MATCH_THRESHOLD` | `0.45` | Minimum Jev score to create a match (measured in `../match-eval`) |
+| `ACTIVE_TOPIC_THRESHOLD` | `0.8` | Minimum Jev score to light up a connection on its topic (not measured yet) |
 | `MATCH_COOLDOWN_MINUTES` | `1440` | How long a pair isn't matched again after any match (accepted, declined or ignored); `1` while testing. Old name: `DECLINE_COOLDOWN_MINUTES` |
 
 `users.id` is a UUID. Until sign-up exists, the Tauri app always uses

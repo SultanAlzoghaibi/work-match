@@ -17,11 +17,16 @@ class JevError(Exception):
     pass
 
 
-def score_candidates(my_summary: str, candidates: list[dict]) -> dict:
+def _line(label: str, topic: str | None, summary: str) -> str:
+    return f"{label} ({topic}): {summary}" if topic else f"{label}: {summary}"
+
+
+def score_candidates(my_summary: str, candidates: list[dict], my_topic: str | None = None) -> dict:
     """Return {candidate user_id: P(good match)} for up to MAX_CANDIDATES.
 
     Candidates are labelled "Person 1", "Person 2", ... (no names), so Jev
-    judges the work, not who is doing it.
+    judges the work, not who is doing it. Each line carries the summarizer's
+    topic label when there is one.
     """
     key = os.environ.get("JEV_API")
     if not key:
@@ -30,26 +35,31 @@ def score_candidates(my_summary: str, candidates: list[dict]) -> dict:
     if not candidates:
         return {}
 
-    state = [f"Me: {my_summary}"]
+    state = [_line("Me", my_topic, my_summary)]
     questions = {}
     for index, candidate in enumerate(candidates, start=1):
-        state.append(f"Person {index}: {candidate['task_summary']}")
+        state.append(_line(f"Person {index}", candidate.get("topic"), candidate["task_summary"]))
         questions[f"c{index}"] = {
             "type": "noul",
-            # Wording picked by comparing sample pairs: same-activity pairs
-            # score ~0.9, unrelated ones ~0.05 (a stricter "same task" wording
-            # put two LeetCode sessions at ~0.5).
+            # Criteria, topic labels and MATCH_THRESHOLD=0.45 were measured
+            # together in backend/match-eval ("general"): 96% of 84 labelled
+            # pairs right. Change them together and re-run the eval.
             "instructions": (
                 f"Are Me and Person {index} doing the same kind of activity, so that "
                 "working side by side would help them both?"
             ),
             "criteria": {
                 "true": (
-                    "Same kind of activity and goal (e.g. both practicing coding interview "
-                    "problems, or both searching for an apartment in the same city), even "
-                    "with different specifics."
+                    "They are doing the same kind of activity toward the same subject or "
+                    "goal, so they could help or motivate each other right now. The details "
+                    "can differ: different problems, materials, tools or stages of the same "
+                    "subject still count, and so does one person learning the subject while "
+                    "the other practices or applies it."
                 ),
-                "false": "Different kinds of activities or goals.",
+                "false": (
+                    "Their activities are different, or they only share a broad category of "
+                    "activity while the specific subject, field, goal or place is different."
+                ),
             },
         }
 
