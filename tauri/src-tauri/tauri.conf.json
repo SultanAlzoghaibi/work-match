@@ -26,6 +26,22 @@
         "resizable": false,
         "visible": false,
         "url": "index.html"
+      },
+      {
+        "label": "match",
+        "title": "work-match match",
+        "width": 340,
+        "height": 200,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false,
+        "visible": false,
+        "url": "match.html"
       }
     ],
     "security": {

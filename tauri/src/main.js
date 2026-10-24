@@ -101,6 +101,12 @@ function renderProfile(profile) {
         detailRow("Discord", profile.discord_handle),
         detailRow("Sharing", profile.sharing_enabled ? "On" : "Off"),
       ),
+      // Demo only: raise the liquid glass match popup with mock data.
+      el(
+        "button",
+        { class: "secondary trigger", onclick: () => invoke("trigger_mock_match") },
+        "Trigger match found",
+      ),
       el(
         "footer",
         {},

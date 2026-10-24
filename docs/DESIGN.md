@@ -29,9 +29,9 @@ Accept → add as a connection and jump into a call (a Discord call link for the
 
 | Platform | Status | Window style |
 |---|---|---|
-| macOS 26+ | Main target | Native Liquid Glass NSPanel |
-| macOS 11–25 | Works | NSPanel + HUD vibrancy blur |
-| Windows | Builds/runs, not the focus | Plain transparent window + CSS semi-transparent card |
+| macOS 26+ | Main target | Solid dark main panel; Liquid Glass match popup |
+| macOS 11–25 | Works | Solid dark main panel; HUD vibrancy match popup |
+| Windows | Builds/runs, not the focus | Solid dark main panel; plain match popup |
 | Linux | Out of scope | – |
 
 ### Why a desktop app and not just a Chrome extension?
@@ -75,7 +75,8 @@ Flow: detect activity → summarize on device → push every 5 min → backend r
 
 Behaviour:
 - App starts hidden, lives in the menu bar.
-- Left-click tray → panel opens under the icon on Liquid Glass (mock login, then profile view/edit). Left-click again → closes.
+- Left-click tray → main panel opens under the icon: a solid dark window (mock login, then profile view/edit). Left-click again → closes.
+- **Match popup** (`match.html`, window label `match`): a separate small **Liquid Glass** panel in the top-right corner, shown only for an incoming match. It never takes focus, has Work together / Not now, and closes itself after 2 min. For now the "Trigger match found" button on the profile raises it with mock data (`match_popup.rs`). Later the `/poll` loop will call `offer_match` with real matches.
 - Clicking other apps does **not** hide it; it stays until toggled from the tray or quit.
 - Right-click → menu → Open / Quit.
 - Windows: same, but centered on screen with a CSS translucent card.

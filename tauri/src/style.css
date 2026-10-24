@@ -20,12 +20,9 @@ body {
   display: flex;
   flex-direction: column;
   border-radius: 26px;
-}
-
-/* Windows / macOS < 26: no native glass, fake it with a translucent card. */
-.os-other #root {
-  background: rgba(15, 15, 15, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  /* Solid dark window; liquid glass is reserved for the match popup. */
+  background: #1c1c1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 section,
@@ -81,6 +78,19 @@ button.primary {
 
 button.primary:hover {
   background: rgba(255, 255, 255, 0.32);
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+button.secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.trigger {
+  margin-top: 14px;
+  width: 100%;
 }
 
 button:disabled {

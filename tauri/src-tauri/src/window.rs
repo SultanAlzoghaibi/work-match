@@ -18,6 +18,15 @@ tauri_panel! {
             is_floating_panel: true,
         }
     })
+
+    // Match popup: floats in the corner over whatever you're doing. Clicks
+    // still reach its buttons, but it never takes keyboard focus.
+    panel!(MatchPanel {
+        config: {
+            can_become_key_window: false,
+            is_floating_panel: true,
+        }
+    })
 }
 
 /// Tray left-click: open the panel, or close it if it's already showing.
@@ -79,6 +88,20 @@ const EDGE_GAP: f64 = 8.0;
 /// Cocoa coordinates: origin bottom-left, y grows upward.
 #[cfg(target_os = "macos")]
 fn tray_anchored_frame(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> NSRect {
+    let mouse = tauri_nspanel::objc2_app_kit::NSEvent::mouseLocation();
+    let visible = cursor_screen_visible_frame(main_thread);
+
+    let top = visible.origin.y + visible.size.height - EDGE_GAP;
+    let min_x = visible.origin.x + EDGE_GAP;
+    let max_x = visible.origin.x + visible.size.width - EDGE_GAP;
+    let x = (mouse.x - PANEL_SIZE.width / 2.0).clamp(min_x, max_x - PANEL_SIZE.width);
+
+    NSRect::new(NSPoint::new(x, top - PANEL_SIZE.height), PANEL_SIZE)
+}
+
+/// Visible frame (minus menu bar and Dock) of the screen under the cursor.
+#[cfg(target_os = "macos")]
+fn cursor_screen_visible_frame(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> NSRect {
     use tauri_nspanel::objc2_app_kit::{NSEvent, NSScreen};
 
     let mouse = NSEvent::mouseLocation();
@@ -93,17 +116,51 @@ fn tray_anchored_frame(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> N
                 && mouse.y <= frame.origin.y + frame.size.height
         })
         .or_else(|| NSScreen::mainScreen(main_thread));
-    let visible = screen.map(|screen| screen.visibleFrame()).unwrap_or(NSRect::new(
+    screen.map(|screen| screen.visibleFrame()).unwrap_or(NSRect::new(
         NSPoint::new(0.0, 0.0),
         NSSize::new(1440.0, 900.0),
-    ));
+    ))
+}
 
-    let top = visible.origin.y + visible.size.height - EDGE_GAP;
-    let min_x = visible.origin.x + EDGE_GAP;
-    let max_x = visible.origin.x + visible.size.width - EDGE_GAP;
-    let x = (mouse.x - PANEL_SIZE.width / 2.0).clamp(min_x, max_x - PANEL_SIZE.width);
+/// Match popup size in points; keep in sync with the "match" window in tauri.conf.json.
+#[cfg(target_os = "macos")]
+const MATCH_SIZE: NSSize = NSSize::new(340.0, 200.0);
 
-    NSRect::new(NSPoint::new(x, top - PANEL_SIZE.height), PANEL_SIZE)
+/// Show the match popup in the top-right corner of the screen with the
+/// cursor, without activating the app or stealing focus from the user's work.
+#[cfg(target_os = "macos")]
+pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
+    let app_for_main = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Ok(panel) = app_for_main.get_webview_panel(crate::MATCH_LABEL) else {
+            return;
+        };
+        let Some(main_thread) = tauri_nspanel::objc2::MainThreadMarker::new() else {
+            return;
+        };
+        let visible = cursor_screen_visible_frame(main_thread);
+        let origin = NSPoint::new(
+            visible.origin.x + visible.size.width - MATCH_SIZE.width - EDGE_GAP,
+            visible.origin.y + visible.size.height - MATCH_SIZE.height - EDGE_GAP,
+        );
+        panel
+            .as_panel()
+            .setFrame_display(NSRect::new(origin, MATCH_SIZE), true);
+        panel.show();
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window(crate::MATCH_LABEL) {
+        let _ = window.show();
+    }
+}
+
+pub fn hide_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window(crate::MATCH_LABEL) {
+        let _ = window.hide();
+    }
 }
 
 /// Windows (and anything non-macOS): plain show + focus on the cursor's monitor.
@@ -131,6 +188,8 @@ enum Error {
 pub trait WebviewWindowExt<R: Runtime> {
     #[cfg(target_os = "macos")]
     fn to_spotlight_panel(&self) -> tauri::Result<PanelHandle<R>>;
+    #[cfg(target_os = "macos")]
+    fn to_match_panel(&self) -> tauri::Result<PanelHandle<R>>;
     #[cfg(not(target_os = "macos"))]
     fn center_at_cursor_monitor(&self) -> tauri::Result<()>;
 }
@@ -152,6 +211,25 @@ impl<R: Runtime> WebviewWindowExt<R> for WebviewWindow<R> {
         let _ = panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
         // Round the NSPanel itself so the glass matches the rounded CSS layout.
         panel.set_corner_radius(26.0);
+
+        Ok(panel)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn to_match_panel(&self) -> tauri::Result<PanelHandle<R>> {
+        let panel = self
+            .to_panel::<MatchPanel<R>>()
+            .map_err(|_| TauriError::Anyhow(Error::Panel.into()))?;
+
+        panel.set_level(PanelLevel::Floating.value());
+        panel.set_collection_behavior(
+            CollectionBehavior::new()
+                .can_join_all_spaces()
+                .full_screen_auxiliary()
+                .value(),
+        );
+        let _ = panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+        panel.set_corner_radius(22.0);
 
         Ok(panel)
     }

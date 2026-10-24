@@ -1,4 +1,5 @@
 mod db;
+mod match_popup;
 mod window;
 
 use crate::window::WebviewWindowExt;
@@ -7,6 +8,7 @@ use tauri::{Manager, WebviewWindow};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 pub const MAIN_LABEL: &str = "main";
+pub const MATCH_LABEL: &str = "match";
 /// Local SQLite file, created in the app data dir. Keep in sync with
 /// plugins.sql.preload in tauri.conf.json and src/db.js.
 pub const DB_FILE: &str = "sqlite:work_match.db";
@@ -45,6 +47,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_nspanel::init());
 
     builder
+        .manage(match_popup::PendingMatch::default())
         .setup(|app| {
             // Accessory: no dock icon, lives only in the menu bar.
             #[cfg(target_os = "macos")]
@@ -57,6 +60,8 @@ pub fn run() {
 
             let main_window = app.get_webview_window(MAIN_LABEL).unwrap();
             main_window.hide().ok();
+            let match_window = app.get_webview_window(MATCH_LABEL).unwrap();
+            match_window.hide().ok();
 
             let header_item = tauri::menu::MenuItemBuilder::new("work-match")
                 .id("header")
@@ -100,10 +105,13 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Main panel is a solid dark window (CSS); only the match popup
+            // gets liquid glass.
             #[cfg(target_os = "macos")]
             {
                 main_window.to_spotlight_panel()?;
-                apply_window_style(&main_window);
+                match_window.to_match_panel()?;
+                apply_window_style(&match_window);
             }
 
             #[cfg(not(target_os = "macos"))]
@@ -111,7 +119,12 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![os_name])
+        .invoke_handler(tauri::generate_handler![
+            os_name,
+            match_popup::trigger_mock_match,
+            match_popup::current_match,
+            match_popup::respond_match,
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app_handle, _event| {});
@@ -141,11 +154,11 @@ fn apply_window_style(window: &WebviewWindow) {
             window,
             NSGlassEffectViewStyle::Clear,
             Some((0, 0, 0, 200)),
-            Some(26.0),
+            Some(22.0),
         )
         .expect("liquid glass unsupported");
     } else {
-        apply_vibrancy(window, NSVisualEffectMaterial::HudWindow, None, Some(26.0))
+        apply_vibrancy(window, NSVisualEffectMaterial::HudWindow, None, Some(22.0))
             .expect("vibrancy unsupported");
     }
 }
