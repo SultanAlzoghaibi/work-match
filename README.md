@@ -96,6 +96,6 @@ It sends only this body, and only when the local model marks the summary as shar
   connections and the "friend is active" icon.
 
 Nothing else leaves the laptop: no URLs, page text, titles or timestamps. When a summary
-isn't shareable, nothing is sent. This is the body of `POST /push` in
-[docs/API.md](docs/API.md). The app doesn't send it yet: `api::on_summary` in
-`tauri/src-tauri/src/api.rs` is still a stub.
+isn't shareable, nothing is sent. `api::on_summary` in `tauri/src-tauri/src/api.rs` sends
+it as the body of `POST /users/{id}/push` (see
+[backend/fastapi-sultan/README.md](backend/fastapi-sultan/README.md)).
