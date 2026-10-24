@@ -161,18 +161,34 @@ async fn topic_eval() {
     let mut outcomes = Vec::new();
     for case in &cases.cases {
         let (captures, apps) = inputs(case);
+        let raw = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
         let summary = summarize(&captures, &apps, None, NOW, 5, |prompt| {
             let client = client.clone();
             let url = url.clone();
-            async move { ask(&client, &url, prompt).await }
+            let raw = raw.clone();
+            async move {
+                let reply = ask(&client, &url, prompt).await;
+                if let Ok(text) = &reply {
+                    *raw.lock().unwrap() = text.clone();
+                }
+                reply
+            }
         })
         .await;
+        // The model's own words for the activity, before it picked a label.
+        let raw_reply = serde_json::from_str::<Value>(&raw.lock().unwrap()).unwrap_or_default();
+        let model_activity = format!(
+            "{} → {}",
+            raw_reply["activity"].as_str().unwrap_or(""),
+            raw_reply["topic"].as_str().unwrap_or("")
+        );
         let (pass, why) = judge(case, &summary);
         let focus_ok = !case.shareable || (!summary.focus.is_empty() && !names_any(&summary.focus, &case.bad_words));
         println!(
-            "{} {:28} {:22} {:32} {}{}",
+            "{} {:28} [{:38}] {:22} {:32} {}{}",
             if case.unsure { "?" } else if pass { "✓" } else { "✗" },
             case.name,
+            model_activity,
             if summary.shareable { format!("{:?}", summary.topic) } else { "(not shared)".into() },
             if summary.shareable { format!("{}{:?}", if focus_ok { "" } else { "!" }, summary.focus) } else { String::new() },
             summary.task_summary,

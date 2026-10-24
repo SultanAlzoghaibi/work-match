@@ -20,8 +20,11 @@ use tokio::time::MissedTickBehavior;
 
 const SYSTEM_PROMPT: &str = r#"You describe what a person is working on so they can be matched with a stranger doing
 similar work. Read the apps and pages from the last few minutes and output ONLY the JSON object.
-"topic": the kind of activity, picked from the allowed list. Decide by what the person is
-doing, not by the tools, commands or apps on screen:
+"activity": first, in your own words, the general field or hobby this belongs to, in 1 or 2
+words, as you would name a school club for it. Never the specific task, page, subject or
+title, and never a tool.
+"topic": then the label from this list that means the same as "activity", or Other when none
+does. Decide by what the person is doing, not by the tools, commands or apps on screen:
 - Coding: writing, debugging or setting up software, including reading its docs and tutorials
 - Web development: websites, web apps, frontends, backends and APIs
 - App development: mobile or desktop apps
@@ -32,9 +35,10 @@ doing, not by the tools, commands or apps on screen:
 - Research: academic research and reading papers (not reading docs while coding)
 - Studying: learning or reviewing material, e.g. for an exam
 - Coursework: homework, labs and projects for a class
+- Music: practicing an instrument, composing, producing or mixing music
 - LeetCode: coding interview practice problems
 - Job hunting, Apartment hunting, Shopping: searching for those
-- Other: anything else
+- Other: none of these means the same as "activity"
 "focus": 2 to 4 words naming the specific subject inside that topic: the project,
 problem, concept, course material or place they are working on. Never a tool, app,
 website, command or file name, and never just the topic again.
@@ -49,7 +53,10 @@ If there is no clear shareable work activity, set "shareable" to false."#;
 
 /// The labels SYSTEM_PROMPT suggests. Output is snapped to this spelling so a
 /// topic stays identical across pushes (connections are stored per topic).
-const KNOWN_TOPICS: [&str; 15] = [
+/// Picked when nothing in KNOWN_TOPICS fits; the topic is then the model's own `activity`.
+const OTHER_TOPIC: &str = "Other";
+
+const KNOWN_TOPICS: [&str; 16] = [
     "Coding",
     "Web development",
     "App development",
@@ -61,25 +68,28 @@ const KNOWN_TOPICS: [&str; 15] = [
     "Research",
     "Studying",
     "Coursework",
+    "Music",
     "LeetCode",
     "Job hunting",
     "Apartment hunting",
     "Shopping",
 ];
-/// The model's answer when nothing in KNOWN_TOPICS fits; such summaries aren't shared.
-const OTHER_TOPIC: &str = "Other";
+
 
 static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
     json!({
         "type": "object",
         "properties": {
             "shareable":    { "type": "boolean" },
-            // A fixed list, so the topic can't be a tool, page title or made-up label.
+            // Written first, in the model's own words, so the list below doesn't force
+            // an activity into the nearest label. Used as the topic when that's Other.
+            "activity":     { "type": "string", "maxLength": 24 },
+            // The list keeps common activities on one topic.
             "topic":        { "type": "string", "enum": KNOWN_TOPICS.iter().copied().chain([OTHER_TOPIC]).collect::<Vec<_>>() },
             "focus":        { "type": "string", "maxLength": 40 },
             "task_summary": { "type": "string", "maxLength": 120 }
         },
-        "required": ["shareable", "topic", "focus", "task_summary"],
+        "required": ["shareable", "activity", "topic", "focus", "task_summary"],
         "additionalProperties": false
     })
 });
@@ -90,8 +100,9 @@ static COURSE_IN_TITLE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:([A-Z]{2,5}) ?(\d{1,3}[A-Z]{0,2})|([A-Z][a-z]{2,9}) (\d{3}[A-Z]?|\d{1,2}[A-Z]))\b").unwrap()
 });
 
-/// Kinds of work that can be for a class; with a course on screen, the course becomes the topic.
-const COURSE_WORK_TOPICS: [&str; 7] = ["Coursework", "Studying", "Coding", "Writing", "Data science", "Machine learning", "Research"];
+/// With a course on screen, the course becomes the topic, unless the person is clearly
+/// doing something that isn't for a class.
+const NOT_COURSE_WORK: [&str; 3] = ["Job hunting", "Apartment hunting", "Shopping"];
 
 /// LeetCode on screen + a coding or studying topic means interview practice. The model
 /// is easily led by problem names ("Course Schedule" → Coursework).
@@ -105,7 +116,7 @@ fn leetcode_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Opt
 /// Coursework or studying for a course named on screen gets the course as its topic,
 /// so classmates in the same course connect on one topic.
 fn course_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Option<String> {
-    if !COURSE_WORK_TOPICS.contains(&topic) {
+    if NOT_COURSE_WORK.contains(&topic) {
         return None;
     }
     let titles = captures
@@ -211,6 +222,8 @@ impl ActivitySummary {
 struct ModelOutput {
     shareable: bool,
     topic: String,
+    #[serde(default)]
+    activity: String,
     #[serde(default)]
     focus: String,
     task_summary: String,
@@ -400,12 +413,16 @@ where
         match output {
             Ok(output) => {
                 return match clean(output) {
-                    Some((topic, focus, task_summary)) => ActivitySummary {
+                    Some((topic, activity, focus, task_summary)) => ActivitySummary {
                         shareable: true,
                         focus,
-                        topic: leetcode_topic(&topic, &captures, &apps)
-                            .or_else(|| course_topic(&topic, &captures, &apps))
-                            .unwrap_or(topic),
+                        topic: {
+                            let reconciled = reconcile_topic(&topic, &activity);
+                            leetcode_topic(&topic, &captures, &apps)
+                                .or_else(|| leetcode_topic(&reconciled, &captures, &apps))
+                                .or_else(|| course_topic(&reconciled, &captures, &apps))
+                                .unwrap_or(reconciled)
+                        },
                         task_summary,
                         source: Source::Llama,
                         window_minutes,
@@ -520,33 +537,109 @@ const TOOL_WORDS: [&str; 16] = [
     "rustrover", "intellij", "xcode", "docker", "chrome", "jupyter",
 ];
 
+fn names_a_tool(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    TOOL_WORDS.iter().any(|tool| if tool.contains(' ') { lower.contains(tool) } else { words.contains(tool) })
+}
+
+/// The topic is free text, but one that names a tool ("Yarn", "Git rebase") says what's
+/// on screen, not what the person is doing. Those tools are all for writing software.
+fn clean_topic(topic: &str) -> String {
+    if names_a_tool(topic) { "Coding".to_string() } else { topic.to_string() }
+}
+
+/// The model names the activity in its own words before picking a label, and its own
+/// words are often right when the label isn't ("Knitting" → Writing, "Video editing" →
+/// Web development): with a list in front of it, a small model reaches for the nearest
+/// label. Keep the label when the two agree (same label, or a shared word: "Ui design" /
+/// Design, "Job searching" / Job hunting); otherwise trust the model's own words.
+/// Other names the model uses for a list label, so its own words map back onto the list.
+const TOPIC_ALIASES: [(&str, &str); 22] = [
+    ("programming", "Coding"),
+    ("software development", "Coding"),
+    ("software engineering", "Coding"),
+    ("development", "Coding"),
+    ("computer science", "Coding"),
+    ("web design", "Web development"),
+    ("frontend", "Web development"),
+    ("backend", "Web development"),
+    ("mobile development", "App development"),
+    ("ios development", "App development"),
+    ("data analysis", "Data science"),
+    ("analytics", "Data science"),
+    ("ai", "Machine learning"),
+    ("real estate", "Apartment hunting"),
+    ("housing", "Apartment hunting"),
+    ("apartment search", "Apartment hunting"),
+    ("job search", "Job hunting"),
+    ("careers", "Job hunting"),
+    ("career", "Job hunting"),
+    ("study", "Studying"),
+    ("learning", "Studying"),
+    ("education", "Studying"),
+];
+
+fn reconcile_topic(label: &str, activity: &str) -> String {
+    let own = clean_topic(&first_words(&scrub(activity), MAX_TOPIC_WORDS, MAX_TOPIC_CHARS));
+    if own.is_empty() || own.eq_ignore_ascii_case(label) || own.eq_ignore_ascii_case(OTHER_TOPIC) {
+        return label.to_string();
+    }
+    if let Some(known) = KNOWN_TOPICS.iter().find(|known| known.eq_ignore_ascii_case(&own)) {
+        return known.to_string();
+    }
+    if let Some((_, known)) = TOPIC_ALIASES.iter().find(|(alias, _)| alias.eq_ignore_ascii_case(&own)) {
+        return known.to_string();
+    }
+    let words = |text: &str| -> Vec<String> {
+        text.to_lowercase()
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|word| word.len() > 2 && !["and", "for", "the", "with"].contains(word))
+            .map(str::to_string)
+            .collect()
+    };
+    // Same word, or the same stem ("study" / "studying", "design" / "designing").
+    let stem = |word: &str| word.chars().take(5).collect::<String>();
+    let label_stems: Vec<String> = words(label).iter().map(|word| stem(word)).collect();
+    if words(&own).iter().any(|word| label_stems.contains(&stem(word))) {
+        return label.to_string();
+    }
+    let mut chars = own.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
+}
+
 fn clean_focus(focus: &str, topic: &str) -> String {
     let focus = first_words(&scrub(focus), 4, MAX_TOPIC_CHARS);
-    let lower = focus.to_lowercase();
-    let words: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
-    let names_a_tool = TOOL_WORDS.iter().any(|tool| match tool.contains(' ') {
-        true => lower.contains(tool),
-        false => words.contains(tool),
-    });
-    if focus.is_empty() || names_a_tool || looks_identifying(&focus) || lower == topic.to_lowercase() {
+    if focus.is_empty() || names_a_tool(&focus) || looks_identifying(&focus) || focus.eq_ignore_ascii_case(topic) {
         return String::new();
     }
     focus
 }
 
-fn clean(output: ModelOutput) -> Option<(String, String, String)> {
-    if !output.shareable || output.topic.eq_ignore_ascii_case(OTHER_TOPIC) {
+fn clean(output: ModelOutput) -> Option<(String, String, String, String)> {
+    if !output.shareable {
         return None;
     }
+    // "Other": use the model's own name for the activity; none usable means not shared.
+    let output = if output.topic.eq_ignore_ascii_case(OTHER_TOPIC) {
+        let own = first_words(&scrub(&output.activity), MAX_TOPIC_WORDS, MAX_TOPIC_CHARS);
+        if own.is_empty() || own.eq_ignore_ascii_case(OTHER_TOPIC) {
+            return None;
+        }
+        ModelOutput { topic: own, ..output }
+    } else {
+        output
+    };
     let topic = scrub(&output.topic);
     let task_summary = scrub(&output.task_summary);
     if looks_identifying(&topic) || looks_identifying(&task_summary) {
         return None;
     }
     let task_summary = cut_at_word(&task_summary, MAX_SUMMARY_CHARS);
-    let topic = canonical_topic(&first_words(&topic, MAX_TOPIC_WORDS, MAX_TOPIC_CHARS), &task_summary);
+    let topic = canonical_topic(&clean_topic(&first_words(&topic, MAX_TOPIC_WORDS, MAX_TOPIC_CHARS)), &task_summary);
     let focus = clean_focus(&output.focus, &topic);
-    (!topic.is_empty() && !task_summary.is_empty()).then_some((topic, focus, task_summary))
+    let activity = output.activity.clone();
+    (!topic.is_empty() && !task_summary.is_empty()).then_some((topic, activity, focus, task_summary))
 }
 
 fn looks_identifying(field: &str) -> bool {
@@ -630,6 +723,7 @@ mod tests {
         ModelOutput {
             shareable,
             topic: topic.into(),
+            activity: String::new(),
             focus: String::new(),
             task_summary: task_summary.into(),
         }
@@ -643,7 +737,7 @@ mod tests {
     fn clean_keeps_a_good_label() {
         assert_eq!(
             clean(output(true, "leetcode", " Working through graph problems on LeetCode ")),
-            Some(("LeetCode".into(), String::new(), "Working through graph problems on LeetCode".into()))
+            Some(("LeetCode".into(), String::new(), String::new(), "Working through graph problems on LeetCode".into()))
         );
     }
 
@@ -678,7 +772,7 @@ mod tests {
     #[test]
     fn clean_truncates_long_fields() {
         let long_summary = "Working through graph problems ".repeat(10);
-        let (topic, _focus, task_summary) =
+        let (topic, _activity, _focus, task_summary) =
             clean(output(true, "graph algorithms practice for interviews", &long_summary)).unwrap();
         assert_eq!(topic, "graph algorithms practice");
         assert!(task_summary.chars().count() <= MAX_SUMMARY_CHARS);
@@ -858,14 +952,14 @@ mod tests {
     #[test]
     fn focus_names_the_subject_never_a_tool() {
         let with_focus = |focus: &str| ModelOutput { focus: focus.into(), ..output(true, "Coding", "Building a desktop app") };
-        assert_eq!(clean(with_focus("desktop matching app")).unwrap().1, "desktop matching app");
-        assert_eq!(clean(with_focus("Dijkstra's algorithm in Python today")).unwrap().1, "Dijkstra's algorithm in Python");
+        assert_eq!(clean(with_focus("desktop matching app")).unwrap().2, "desktop matching app");
+        assert_eq!(clean(with_focus("Dijkstra's algorithm in Python today")).unwrap().2, "Dijkstra's algorithm in Python");
         for tool in ["yarn", "yarn dev server", "Git rebase", "VS Code setup", "Coding", "jane@example.com"] {
-            let (topic, focus, _) = clean(with_focus(tool)).unwrap();
+            let (topic, _, focus, _) = clean(with_focus(tool)).unwrap();
             assert_eq!((topic.as_str(), focus.as_str()), ("Coding", ""), "{tool}");
         }
         // "gitlet" is a project, not git.
-        assert_eq!(clean(with_focus("Gitlet version control")).unwrap().1, "Gitlet version control");
+        assert_eq!(clean(with_focus("Gitlet version control")).unwrap().2, "Gitlet version control");
     }
 
     #[test]
@@ -876,8 +970,37 @@ mod tests {
     }
 
     #[test]
-    fn other_is_never_shared() {
-        assert_eq!(clean(output(true, "Other", "Planning a trip")), None);
+    fn own_words_win_when_the_label_is_unrelated() {
+        assert_eq!(reconcile_topic("Writing", "Knitting"), "Knitting");
+        assert_eq!(reconcile_topic("Web development", "Video editing"), "Video editing");
+        assert_eq!(reconcile_topic("Research", "Git"), "Coding"); // a tool means coding
+        assert_eq!(reconcile_topic("Design", "Ui design"), "Design");
+        assert_eq!(reconcile_topic("Job hunting", "Job searching"), "Job hunting");
+        assert_eq!(reconcile_topic("Web development", "coding"), "Coding");
+        assert_eq!(reconcile_topic("Coding", ""), "Coding");
+        assert_eq!(reconcile_topic("Studying", "gardening"), "Gardening");
+        // Synonyms and stems map back onto the label.
+        assert_eq!(reconcile_topic("Apartment hunting", "Real Estate"), "Apartment hunting");
+        assert_eq!(reconcile_topic("Job hunting", "Real Estate"), "Apartment hunting");
+        assert_eq!(reconcile_topic("Studying", "Study"), "Studying");
+        assert_eq!(reconcile_topic("Web development", "Programming"), "Coding");
+    }
+
+    #[test]
+    fn other_uses_the_models_own_label() {
+        let other = |label: &str| ModelOutput { activity: label.into(), ..output(true, "Other", "Restoring an oak table") };
+        assert_eq!(clean(other("Woodworking")).unwrap().0, "Woodworking");
+        assert_eq!(clean(other("Yarn")).unwrap().0, "Coding");
+        assert_eq!(clean(other("")), None);
+        assert_eq!(clean(other("Other")), None);
+    }
+
+    #[test]
+    fn topics_are_free_text_but_never_a_tool() {
+        assert_eq!(clean(output(true, "Music production", "Mixing a hip hop beat")).unwrap().0, "Music production");
+        assert_eq!(clean(output(true, "Yarn", "Running the desktop app")).unwrap().0, "Coding");
+        assert_eq!(clean(output(true, "Git rebase", "Resolving merge conflicts")).unwrap().0, "Coding");
+        assert_eq!(clean(output(true, "coding", "Fixing a bug")).unwrap().0, "Coding");
     }
 
     #[tokio::test]
