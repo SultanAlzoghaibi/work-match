@@ -132,6 +132,16 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.28.2.tgz#b21affb804cc167c133d95f45b3a1dc1323b9a87"
   integrity sha512-5ebpxr3nWMzrL/rnUI755Jkuee0bHL/Gq0WTF9lvcpv73wAp5eu8MfBUgWK9bhWvZjj7yX8etf/8tI8Ney695g==
 
+"@fontsource/bowlby-one@^5":
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/@fontsource/bowlby-one/-/bowlby-one-5.3.0.tgz#a9b3dbb23b6372bddac61cad6dd28245da79135d"
+  integrity sha512-mjHkM64RbN4I2xFpk+6sQt+aF/k46IHEWP6ul4/RwAYJF5ETDjUmDp1zgU2Tj/w2yYIjMGVyGVifCNNR5ZbyZQ==
+
+"@fontsource/inter@^5":
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/@fontsource/inter/-/inter-5.3.0.tgz#866278dc2357659f8be1755c8b67f29d3697b440"
+  integrity sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==
+
 "@napi-rs/lzma-linux-x64-gnu@1.5.1":
   version "1.5.1"
   resolved "https://registry.yarnpkg.com/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz#e57d4306966078662038094fb38eb9146dc3aea9"

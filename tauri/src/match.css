@@ -1,6 +1,14 @@
+/* Match popup: stays on clear liquid glass (see STYLE_GUIDE.md, "Liquid glass
+   exception"). Borrows the guide's fonts, pill buttons and 20px card. */
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Bowlby One", "Inter", system-ui, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --radius-pill: 1600px;
+  --radius-card: 20px;
+  font-family: var(--font-ui);
+  font-weight: 500;
   font-size: 13px;
+  letter-spacing: -0.01em;
   color: #fff;
 }
 
@@ -31,10 +39,10 @@ p {
 }
 
 .eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.7;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 0.8;
+  text-transform: uppercase;
 }
 
 .intro {
@@ -67,37 +75,45 @@ p {
 button {
   text-shadow: none;
   font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.032em;
   color: inherit;
-  border: none;
-  border-radius: 10px;
-  padding: 7px 14px;
+  border: 1px solid #fff;
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
   cursor: pointer;
+  transition: transform 0.1s ease;
 }
 
+button:hover {
+  transform: translateY(-1px);
+}
+
+/* Primary on glass: white fill, black text (the guide's "filled action"). */
 button.primary {
-  background: rgba(255, 255, 255, 0.3);
-  font-weight: 600;
+  background: #fff;
+  color: #000;
 }
 
-button.primary:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
+/* Ghost on glass: transparent with a white outline. */
 button.secondary {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
 }
 
 button.secondary:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .error {
   font-size: 11px;
-  color: #ffb4b4;
+  font-weight: 700;
 }
 
 .card {
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.1);
   padding: 8px 10px;
   display: flex;
@@ -107,7 +123,7 @@ button.secondary:hover {
 }
 
 .card-name {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .card-row {

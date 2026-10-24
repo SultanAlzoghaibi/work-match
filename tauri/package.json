@@ -11,6 +11,8 @@
     "dev2": "CARGO_TARGET_DIR=$PWD/src-tauri/target-instance2 tauri dev --config src-tauri/tauri.conf.instance2.json"
   },
   "dependencies": {
+    "@fontsource/bowlby-one": "^5",
+    "@fontsource/inter": "^5",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-sql": "~2"
   },

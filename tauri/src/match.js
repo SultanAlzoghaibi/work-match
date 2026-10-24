@@ -1,3 +1,6 @@
+import "@fontsource/bowlby-one/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/700.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -63,43 +66,49 @@ function closeButton(view) {
   );
 }
 
+/// Like replaceChildren, but skips null (optional lines), which the DOM would
+/// otherwise render as the text "null".
+function show(...nodes) {
+  popup.replaceChildren(...nodes.filter((node) => node != null));
+}
+
 function render(view) {
   if (!view) {
-    popup.replaceChildren();
+    show();
     return;
   }
   const { other } = view;
   const name = other.name;
 
   if (view.my_status === "accepted" && view.their_status === "accepted") {
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "🎉 It's a match"),
       el("p", { class: "intro" }, "You both accepted! Time to work together on ", el("strong", {}, view.topic), "."),
       personCard(other),
       closeButton(view),
     );
   } else if (view.their_status === "declined") {
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "Match declined"),
       el("p", { class: "intro" }, el("strong", {}, name), " declined this time."),
       personCard(other),
       closeButton(view),
     );
   } else if (view.my_status === "declined") {
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "Match declined"),
       el("p", { class: "intro" }, "You passed on ", el("strong", {}, name), "."),
       personCard(other),
       closeButton(view),
     );
   } else if (view.expired) {
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "Match expired"),
       el("p", { class: "intro" }, "This match with ", el("strong", {}, name), " expired."),
       closeButton(view),
     );
   } else if (view.my_status === "accepted") {
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "🌍 Match found"),
       el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to answer…"),
       el("p", { class: "task" }, other.task_summary ?? ""),
@@ -115,7 +124,7 @@ function render(view) {
       }
     };
     const meta = [other.school, other.bio].filter(Boolean).join(" · ");
-    popup.replaceChildren(
+    show(
       el("div", { class: "eyebrow" }, "🌍 Match found"),
       el(
         "p",

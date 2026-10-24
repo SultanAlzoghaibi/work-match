@@ -1,3 +1,6 @@
+import "@fontsource/bowlby-one/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/700.css";
 import { invoke } from "@tauri-apps/api/core";
 import { API_URL, MOCK_USER_ID, clearTask, pushTask, updateUser } from "./api.js";
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
@@ -206,7 +209,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 function show(...nodes) {
-  root.replaceChildren(...nodes);
+  root.replaceChildren(...nodes.filter((node) => node != null));
 }
 
 function renderError(err) {
@@ -232,9 +235,12 @@ function renderLogin() {
     el(
       "section",
       { class: "login" },
-      el("div", { class: "logo" }, "🌍"),
-      el("h1", {}, "work-match"),
-      el("p", { class: "muted" }, "Find someone working on the same thing, right now."),
+      el("div", { class: "sticker blue" }, "🌍"),
+      el("div", { class: "sticker sun" }, "⚡"),
+      el("div", { class: "sticker mint" }, "✓"),
+      el("div", { class: "sticker ember" }, "★"),
+      el("h1", { class: "display" }, "Work", el("br"), "Match"),
+      el("p", { class: "tagline" }, "Find someone working on the same thing, right now."),
       continueButton,
       el("p", { class: "fine" }, "Mock sign-in for the demo: no account needed."),
     ),
@@ -266,6 +272,7 @@ function renderProfile(profile) {
         "header",
         {},
         el("div", { class: "avatar" }, initial),
+        el("div", { class: "sticker violet" }, "🌍"),
         el(
           "div",
           { class: "who" },
