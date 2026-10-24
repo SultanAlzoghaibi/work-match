@@ -90,7 +90,8 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
         ? `last page ${ago(status.last_capture_at, now)} · ${status.captures_in_buffer} in buffer`
         : "no pages yet: load extension/ in chrome://extensions and browse in Chrome",
     ),
-    check(status.accessibility, "Accessibility (window titles)", status.accessibility ? "granted" : "not granted: System Settings → Privacy & Security → Accessibility"),
+    // Always true on Windows, which needs no permission for window titles.
+    check(status.accessibility, "Window titles", status.accessibility ? "readable" : "not granted: System Settings → Privacy & Security → Accessibility"),
     check(status.llm === "ready" ? true : status.llm === "starting" ? null : false, "Llama", status.llm === "down" ? "down: no model / llama-server, summaries fall back (not shared)" : status.llm),
     check(
       status.next_summary_at ? null : false,

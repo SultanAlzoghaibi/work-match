@@ -96,12 +96,36 @@ pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
     });
 }
 
+/// Popup size (logical px) and edge gap; keep in sync with MATCH_SIZE / EDGE_GAP
+/// above and the "match" window in tauri.conf.json.
+#[cfg(not(target_os = "macos"))]
+const MATCH_WIDTH: f64 = 340.0;
+#[cfg(not(target_os = "macos"))]
+const EDGE_GAP: f64 = 8.0;
+
+/// Show the match popup in the top-right corner of the work area (the screen
+/// minus the taskbar) of the monitor with the cursor, like the macOS panel.
 #[cfg(not(target_os = "macos"))]
 pub fn show_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {
-    if let Some(window) = app.get_webview_window(crate::MATCH_LABEL) {
-        let _ = window.show();
-        let _ = window.set_focus();
+    let Some(window) = app.get_webview_window(crate::MATCH_LABEL) else {
+        return;
+    };
+    let monitor = app
+        .cursor_position()
+        .ok()
+        .and_then(|cursor| app.monitor_from_point(cursor.x, cursor.y).ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten());
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area();
+        let scale = monitor.scale_factor();
+        let width = (MATCH_WIDTH * scale).round() as i32;
+        let gap = (EDGE_GAP * scale).round() as i32;
+        let x = area.position.x + area.size.width as i32 - width - gap;
+        let y = area.position.y + gap;
+        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
     }
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 pub fn hide_match_popup<R: Runtime>(app: &tauri::AppHandle<R>) {

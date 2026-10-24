@@ -31,7 +31,8 @@ Accept → add as a connection and jump into a call (a Discord call link for the
 |---|---|---|
 | macOS 26+ | Main target | Solid dark main panel; Liquid Glass match popup |
 | macOS 11–25 | Works | Solid dark main panel; HUD vibrancy match popup |
-| Windows | Builds/runs, not the focus | Solid dark main panel; plain match popup |
+| Windows 11 | Supported (same features) | Main panel under the native title bar; dark Mica match popup |
+| Windows 10 | Supported (same features) | Main panel under the native title bar; dark acrylic match popup |
 | Linux | Out of scope | – |
 
 ### Why a desktop app and not just a Chrome extension?

@@ -34,6 +34,12 @@ body {
   border-radius: 22px;
 }
 
+/* Windows: Mica / acrylic (lib.rs) isn't on every version, so the popup gets
+   its own dark tint and the white text stays readable over any window. */
+.os-windows #popup {
+  background: rgba(20, 20, 28, 0.6);
+}
+
 p {
   margin: 0;
 }

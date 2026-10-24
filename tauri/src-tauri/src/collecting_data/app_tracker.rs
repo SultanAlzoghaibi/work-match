@@ -8,6 +8,11 @@
 // - window title + document: Accessibility (AXFocusedWindow -> AXTitle /
 //   AXDocument). Needs the Accessibility permission; without it only the app
 //   name and bundle id are recorded.
+//
+// Windows APIs (no permission needed):
+// - front app: GetForegroundWindow -> process exe -> its FileDescription
+//   ("Visual Studio Code"); the exe name ("code.exe") stands in for the bundle id
+// - window title: GetWindowTextW, except for browsers (see BROWSER_EXES)
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -16,8 +21,8 @@ use tauri::{AppHandle, Manager};
 const POLL_EVERY: Duration = Duration::from_secs(2);
 
 /// Apps whose window titles are private (messages, mail, passwords, settings):
-/// only the app name is recorded.
-const PRIVATE_APPS: [&str; 9] = [
+/// only the app name is recorded. macOS bundle ids, then Windows exe names.
+const PRIVATE_APPS: &[&str] = &[
     "com.apple.MobileSMS",
     "com.apple.mail",
     "com.apple.FaceTime",
@@ -27,11 +32,36 @@ const PRIVATE_APPS: [&str; 9] = [
     "com.apple.Passwords",
     "com.apple.systempreferences",
     "com.apple.loginwindow",
+    "olk.exe",
+    "outlook.exe",
+    "hxoutlook.exe",
+    "whatsapp.exe",
+    "1password.exe",
+    "bitwarden.exe",
+    "keepassxc.exe",
+    "systemsettings.exe",
+    "lockapp.exe",
+    "credentialuibroker.exe",
+];
+
+/// Windows browsers: their window title is the current tab's title, incognito
+/// tabs included, so it's never recorded. The Chrome extension covers pages.
+#[cfg(any(windows, test))]
+const BROWSER_EXES: [&str; 7] = [
+    "chrome.exe",
+    "msedge.exe",
+    "firefox.exe",
+    "brave.exe",
+    "opera.exe",
+    "vivaldi.exe",
+    "arc.exe",
 ];
 
 /// Our own app (both dev instances) isn't recorded at all.
+#[cfg(target_os = "macos")]
 const OWN_BUNDLE_PREFIX: &str = "com.sultanalzoghaibi.workmatch";
 /// The dev build's process name (no bundle id outside a packaged .app).
+#[cfg(target_os = "macos")]
 const OWN_DEV_BINARY: &str = "work_match";
 
 /// What's in front right now. Two polls with an equal Focus are the same session.
@@ -226,6 +256,7 @@ fn wait_for_table(db_path: &PathBuf) -> Connection {
 }
 
 /// Keep only the parent folder and file name of an AXDocument file URL.
+#[cfg(target_os = "macos")]
 fn short_document(url: &str) -> Option<String> {
     let path = url::Url::parse(url).ok()?.to_file_path().ok()?;
     let file = path.file_name()?.to_string_lossy().into_owned();
@@ -330,12 +361,164 @@ mod platform {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Windows: the Focus for the foreground process's exe path, its
+/// FileDescription and the window title. None for our own app (any instance).
+#[cfg(any(windows, test))]
+fn windows_focus(exe_path: &str, description: Option<String>, title: Option<String>) -> Option<Focus> {
+    let file = exe_path.rsplit(['\\', '/']).next().unwrap_or(exe_path);
+    let exe = file.to_lowercase();
+    if exe.starts_with("work_match") || exe.starts_with("work-match") {
+        return None;
+    }
+    let stem = file.strip_suffix(".exe").or_else(|| file.strip_suffix(".EXE")).unwrap_or(file);
+    let app_name = description
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| stem.to_string());
+    let window_title = title.filter(|_| !BROWSER_EXES.contains(&exe.as_str()));
+    Some(Focus { app_name, bundle_id: Some(exe), window_title, document: None })
+}
+
+#[cfg(windows)]
+mod platform {
+    use super::Focus;
+    use std::collections::HashMap;
+    use std::sync::{LazyLock, Mutex};
+    use tauri::AppHandle;
+    use windows::core::{BOOL, PCWSTR, PWSTR};
+    use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+    use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumChildWindows, GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
+    };
+
+    /// exe path -> FileDescription, so the version resource is read once per app.
+    static DESCRIPTIONS: LazyLock<Mutex<HashMap<String, Option<String>>>> = LazyLock::new(Default::default);
+
+    /// Any app can read window titles on Windows; there's nothing to grant.
+    pub fn accessibility_trusted(_prompt: bool) -> bool {
+        true
+    }
+
+    pub fn current_focus(_app: &AppHandle) -> Option<Focus> {
+        foreground()
+    }
+
+    /// Needs no AppHandle on Windows, so the manual test below can call it.
+    pub(super) fn foreground() -> Option<Focus> {
+        let window = unsafe { GetForegroundWindow() };
+        if window.is_invalid() {
+            return None;
+        }
+        let mut exe = exe_path(process_of(window))?;
+        // Store apps (Calculator, Settings, ...) run inside ApplicationFrameHost.exe;
+        // the real app owns one of its child windows.
+        if exe.to_lowercase().ends_with("\\applicationframehost.exe") {
+            if let Some(hosted) = hosted_process(window).and_then(exe_path) {
+                exe = hosted;
+            }
+        }
+        let description = DESCRIPTIONS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(exe.clone())
+            .or_insert_with(|| file_description(&exe))
+            .clone();
+        super::windows_focus(&exe, description, window_text(window))
+    }
+
+    fn process_of(window: HWND) -> u32 {
+        let mut pid = 0;
+        unsafe { GetWindowThreadProcessId(window, Some(&mut pid)) };
+        pid
+    }
+
+    fn exe_path(pid: u32) -> Option<String> {
+        if pid == 0 {
+            return None;
+        }
+        unsafe {
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+            let mut buffer = [0u16; 1024];
+            let mut len = buffer.len() as u32;
+            let result = QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, PWSTR(buffer.as_mut_ptr()), &mut len);
+            let _ = CloseHandle(process);
+            result.ok()?;
+            Some(String::from_utf16_lossy(&buffer[..len as usize]))
+        }
+    }
+
+    /// The first child window that belongs to another process (a hosted Store app).
+    fn hosted_process(frame: HWND) -> Option<u32> {
+        struct Search {
+            host: u32,
+            found: Option<u32>,
+        }
+        unsafe extern "system" fn visit(child: HWND, lparam: LPARAM) -> BOOL {
+            let search = &mut *(lparam.0 as *mut Search);
+            let pid = process_of(child);
+            if pid != 0 && pid != search.host {
+                search.found = Some(pid);
+                return BOOL(0);
+            }
+            BOOL(1)
+        }
+        let mut search = Search { host: process_of(frame), found: None };
+        unsafe {
+            let _ = EnumChildWindows(Some(frame), Some(visit), LPARAM(&mut search as *mut Search as isize));
+        }
+        search.found
+    }
+
+    fn window_text(window: HWND) -> Option<String> {
+        let mut buffer = [0u16; 512];
+        let len = unsafe { GetWindowTextW(window, &mut buffer) };
+        (len > 0).then(|| String::from_utf16_lossy(&buffer[..len as usize]))
+    }
+
+    /// The exe's FileDescription ("Visual Studio Code"), in its first listed language.
+    fn file_description(exe: &str) -> Option<String> {
+        let path: Vec<u16> = exe.encode_utf16().chain(Some(0)).collect();
+        unsafe {
+            let size = GetFileVersionInfoSizeW(PCWSTR(path.as_ptr()), None);
+            if size == 0 {
+                return None;
+            }
+            let mut data = vec![0u8; size as usize];
+            GetFileVersionInfoW(PCWSTR(path.as_ptr()), None, size, data.as_mut_ptr().cast()).ok()?;
+            // Translation is (language, code page) u16 pairs; its length is in bytes.
+            let (pairs, bytes) = query_value(&data, "\\VarFileInfo\\Translation")?;
+            if bytes < 4 {
+                return None;
+            }
+            let (language, code_page) = (*pairs, *pairs.add(1));
+            let key = format!("\\StringFileInfo\\{language:04x}{code_page:04x}\\FileDescription");
+            // String values report their length in u16s.
+            let (text, units) = query_value(&data, &key)?;
+            let text = String::from_utf16_lossy(std::slice::from_raw_parts(text, units as usize));
+            let text = text.trim_end_matches('\0').trim();
+            (!text.is_empty()).then(|| text.to_string())
+        }
+    }
+
+    /// Pointer into `data` and the reported length of one version-resource value.
+    unsafe fn query_value(data: &[u8], key: &str) -> Option<(*const u16, u32)> {
+        let key: Vec<u16> = key.encode_utf16().chain(Some(0)).collect();
+        let mut value = std::ptr::null_mut();
+        let mut len = 0u32;
+        let found = VerQueryValueW(data.as_ptr().cast(), PCWSTR(key.as_ptr()), &mut value, &mut len);
+        (found.as_bool() && !value.is_null() && len > 0).then_some((value as *const u16, len))
+    }
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 mod platform {
     use super::Focus;
     use tauri::AppHandle;
 
-    // TODO: Windows (GetForegroundWindow + GetWindowTextW).
     pub fn accessibility_trusted(_prompt: bool) -> bool {
         false
     }
@@ -420,6 +603,8 @@ mod tests {
         assert!(!rows[1].window_title.as_deref().unwrap().contains('@'));
     }
 
+    // macOS file URLs; on Windows Url::to_file_path needs a drive letter.
+    #[cfg(target_os = "macos")]
     #[test]
     fn documents_keep_only_folder_and_file() {
         assert_eq!(
@@ -427,6 +612,65 @@ mod tests {
             Some("cs170-hw4/dijkstra.py")
         );
         assert_eq!(short_document("not a url"), None);
+    }
+
+    #[test]
+    fn windows_focus_names_the_app_and_keeps_its_title() {
+        let focus = windows_focus(
+            r"C:\Users\sam\AppData\Local\Programs\Microsoft VS Code\Code.exe",
+            Some("Visual Studio Code ".into()),
+            Some("dijkstra.py - cs170-hw4 - Visual Studio Code".into()),
+        )
+        .unwrap();
+        assert_eq!(focus.app_name, "Visual Studio Code");
+        assert_eq!(focus.bundle_id.as_deref(), Some("code.exe"));
+        assert_eq!(focus.window_title.as_deref(), Some("dijkstra.py - cs170-hw4 - Visual Studio Code"));
+
+        let no_description = windows_focus(r"C:\Windows\notepad.exe", None, None).unwrap();
+        assert_eq!(no_description.app_name, "notepad");
+    }
+
+    #[test]
+    fn windows_browser_titles_are_never_recorded() {
+        let focus = windows_focus(
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            Some("Google Chrome".into()),
+            Some("Secret tab - Google Chrome (Incognito)".into()),
+        )
+        .unwrap();
+        assert_eq!(focus.app_name, "Google Chrome");
+        assert_eq!(focus.window_title, None);
+    }
+
+    #[test]
+    fn windows_skips_our_own_app_and_blanks_private_apps() {
+        assert_eq!(windows_focus(r"C:\work-match\target\debug\work_match.exe", None, None), None);
+        assert_eq!(windows_focus(r"C:\Program Files\work-match 2\work-match 2.exe", None, None), None);
+
+        let outlook = windows_focus(
+            r"C:\Program Files\WindowsApps\Microsoft.OutlookForWindows\olk.exe",
+            Some("Microsoft Outlook".into()),
+            Some("Inbox - sam@example.com - Outlook".into()),
+        )
+        .unwrap()
+        .cleaned();
+        assert_eq!(outlook.window_title, None);
+    }
+
+    /// Manual check of the Win32 calls against whatever window is in front:
+    ///   cargo test foreground_app_is_readable -- --ignored --nocapture
+    #[cfg(windows)]
+    #[test]
+    #[ignore]
+    fn foreground_app_is_readable() {
+        let focus = platform::foreground().expect("nothing in front (or our own app)");
+        println!(
+            "in front: {} ({:?}), title: {} chars",
+            focus.app_name,
+            focus.bundle_id,
+            focus.window_title.as_deref().map_or(0, |title| title.chars().count())
+        );
+        assert!(!focus.app_name.is_empty());
     }
 
     #[test]
