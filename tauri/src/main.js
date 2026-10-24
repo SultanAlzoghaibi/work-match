@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { MOCK_USER_ID, updateUser } from "./api.js";
+import { MOCK_USER_ID, pushTask, updateUser } from "./api.js";
+import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { AGE_GROUPS, loadProfile, logout, mockLogin, saveProfile } from "./profile.js";
 
 // Same idea as TyA's getOs(): ask Rust for the target OS instead of sniffing
@@ -12,6 +13,45 @@ const root = document.getElementById("root");
 
 /// Result of the last Save, shown once on the profile view.
 let syncStatus = null;
+
+// --- Demo task push ---------------------------------------------------------
+
+/// Buttons that push a random mock summary to curr_task, so matching can be
+/// tested before the on-device summarizer exists.
+function renderTaskDemo() {
+  const status = el("p", { class: "task-status muted" }, "Not sharing a task yet.");
+  const buttons = Object.entries(MOCK_TASKS).map(([kind, task]) => {
+    const button = el(
+      "button",
+      {
+        class: "secondary",
+        onclick: async () => {
+          const summary = randomSummary(kind);
+          button.disabled = true;
+          try {
+            const saved = await pushTask(MOCK_USER_ID, summary, task.topic);
+            status.className = "task-status";
+            status.replaceChildren(el("strong", {}, `${saved.topic}: `), saved.task_summary);
+          } catch (err) {
+            status.className = "task-status error";
+            status.textContent = `Couldn't push: ${err.message}`;
+          } finally {
+            button.disabled = false;
+          }
+        },
+      },
+      task.label,
+    );
+    return button;
+  });
+  return el(
+    "div",
+    { class: "task-demo" },
+    el("span", { class: "label" }, "Push a random task (demo)"),
+    el("div", { class: "task-buttons" }, ...buttons),
+    status,
+  );
+}
 
 /// Tiny DOM helper. Text always goes through textContent, never innerHTML.
 function el(tag, attrs = {}, ...children) {
@@ -106,6 +146,7 @@ function renderProfile(profile) {
         detailRow("Discord", profile.discord_handle),
         detailRow("Sharing", profile.sharing_enabled ? "On" : "Off"),
       ),
+      renderTaskDemo(),
       // Demo only: raise the liquid glass match popup with mock data.
       el(
         "button",

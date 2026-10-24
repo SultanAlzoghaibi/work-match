@@ -36,3 +36,8 @@ export function updateUser(userId, profile) {
     sharing_enabled: Boolean(profile.sharing_enabled),
   });
 }
+
+/// POST /users/{id}/push: overwrite what this user is working on (curr_task).
+export function pushTask(userId, taskSummary, topic) {
+  return request("POST", `/users/${userId}/push`, { task_summary: taskSummary, topic });
+}

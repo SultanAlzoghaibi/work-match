@@ -17,6 +17,7 @@ How matching works: [`../../docs/DATABASE.md`](../../docs/DATABASE.md).
 | `GET` | `/health` | Checks the DB connection |
 | `GET` | `/users/{id}` | Public profile (no token) |
 | `PATCH` | `/users/{id}` | Updates only the fields sent: `name`, `school`, `bio`, `discord_handle`, `age_group`, `country`, `sharing_enabled`. `null` clears a field (except `name` / `sharing_enabled`) |
+| `POST` | `/users/{id}/push` | Body `{task_summary, topic}`. Overwrites the user's `curr_task` row and refreshes their `is_working_on_connections` rows. Match search: TODO |
 
 `users.id` is a UUID. Until sign-up exists, the Tauri app always uses
 `00000000-0000-0000-0000-000000000000` (`MOCK_USER_ID` in `tauri/src/api.js`), which

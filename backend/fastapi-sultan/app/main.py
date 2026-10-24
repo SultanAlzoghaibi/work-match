@@ -2,10 +2,10 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from psycopg import sql
+from psycopg import errors, sql
 
 from .db import connect
-from .schemas import User, UserUpdate
+from .schemas import CurrTask, TaskPush, User, UserUpdate
 
 app = FastAPI(title="work-match backend")
 
@@ -68,4 +68,35 @@ def update_user(user_id: UUID, update: UserUpdate) -> dict:
         row = conn.execute(query, (*changes.values(), user_id)).fetchone()
     if row is None:
         raise HTTPException(404, "user not found")
+    return row
+
+
+# PUSH (schema.sql): overwrite my curr_task, then rewrite my
+# is_working_on_connections rows for connections on this topic.
+# TODO: run the Jev match search for this user after the push.
+@app.post("/users/{user_id}/push", response_model=CurrTask)
+def push_task(user_id: UUID, task: TaskPush) -> dict:
+    try:
+        with connect() as conn:
+            row = conn.execute(
+                """
+                insert into curr_task (user_id, task_summary, topic) values (%s, %s, %s)
+                on conflict (user_id) do update set
+                    task_summary = excluded.task_summary,
+                    topic = excluded.topic,
+                    pushed_at = now()
+                returning user_id, task_summary, topic, pushed_at
+                """,
+                (user_id, task.task_summary, task.topic),
+            ).fetchone()
+            conn.execute("delete from is_working_on_connections where user_id = %s", (user_id,))
+            conn.execute(
+                """
+                insert into is_working_on_connections (connection_id, user_id)
+                select id, %s from connections where %s in (user_a, user_b) and topic = %s
+                """,
+                (user_id, user_id, task.topic),
+            )
+    except errors.ForeignKeyViolation:
+        raise HTTPException(404, "user not found") from None
     return row

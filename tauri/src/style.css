@@ -29,6 +29,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow-y: auto;
 }
 
 #root > * {
@@ -97,6 +98,24 @@ button.secondary {
 
 button.secondary:hover {
   background: rgba(255, 255, 255, 0.18);
+}
+
+.task-demo {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.task-status {
+  font-size: 12px;
+  line-height: 1.4;
+  user-select: text;
 }
 
 .trigger {

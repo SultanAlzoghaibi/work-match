@@ -36,3 +36,17 @@ class UserUpdate(BaseModel):
     @classmethod
     def upper_country(cls, value: str | None) -> str | None:
         return value.upper() if value else value
+
+
+class TaskPush(BaseModel):
+    """What the app is working on now, summarized on the device."""
+
+    task_summary: str = Field(min_length=1, max_length=1000)
+    topic: str | None = Field(default=None, max_length=60)   # short label, e.g. "LeetCode"
+
+
+class CurrTask(BaseModel):
+    user_id: UUID
+    task_summary: str
+    topic: str | None
+    pushed_at: datetime
