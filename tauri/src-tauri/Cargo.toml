@@ -26,8 +26,9 @@ tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "1", features = ["net", "time", "sync"] }
-# Only talks to llama-server on 127.0.0.1, so no TLS backend. The backend push will need `rustls`.
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
+# rustls: the deployed backend (yarn prod -> https://work-match-api.vercel.app)
+# needs HTTPS. Without it every poll and push to it fails, so no match popups.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 regex = "1"
 url = "2"
 sha2 = "0.10"
