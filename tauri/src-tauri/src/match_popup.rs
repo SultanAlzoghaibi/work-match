@@ -29,6 +29,8 @@ struct PollConfig {
 #[derive(Default)]
 pub struct MatchState {
     config: Mutex<Option<PollConfig>>,
+    /// Latest GET /users/{id}/connections (work friends), passed through as-is.
+    connections: Mutex<Option<serde_json::Value>>,
     /// The match the popup is showing (None = no popup).
     current: Mutex<Option<MatchView>>,
     /// Matches the user closed; polling never reopens them.
@@ -37,6 +39,8 @@ pub struct MatchState {
 
 fn show_state<R: Runtime>(app: &tauri::AppHandle<R>, view: MatchView) {
     *app.state::<MatchState>().current.lock().unwrap() = Some(view.clone());
+    // The main window listens too, to stop its task search once matched.
+    let _ = app.emit_to(crate::MAIN_LABEL, "match-state", view.clone());
     let _ = app.emit_to(crate::MATCH_LABEL, "match-state", view);
 }
 
@@ -62,6 +66,13 @@ fn on_poll<R: Runtime>(app: &tauri::AppHandle<R>, matches: Vec<MatchView>) {
     }
 }
 
+/// (api_url, user_id) of this instance's backend user, once the main window
+/// has started polling. Used by api::on_summary to push activity summaries.
+pub fn backend_target<R: Runtime>(app: &tauri::AppHandle<R>) -> Option<(String, String)> {
+    let config = app.try_state::<MatchState>()?.config.lock().unwrap().clone()?;
+    Some((config.api_url, config.user_id))
+}
+
 /// Called once by the main window on load: only the frontend knows which
 /// mock user this instance is (VITE_USER_ID) and where the API is.
 #[tauri::command]
@@ -83,6 +94,7 @@ pub fn start_match_polling<R: Runtime>(app: tauri::AppHandle<R>, user_id: String
         loop {
             let config = app.state::<MatchState>().config.lock().unwrap().clone();
             if let Some(config) = config {
+                poll_connections(&app, &client, &config).await;
                 let url = format!("{}/users/{}/poll", config.api_url, config.user_id);
                 let result = async {
                     client.get(&url).send().await?.error_for_status()?.json::<Vec<MatchView>>().await
@@ -108,17 +120,38 @@ pub fn start_match_polling<R: Runtime>(app: tauri::AppHandle<R>, user_id: String
     });
 }
 
-/// Work together / Not now. Returns the updated match, or an error message
-/// the popup shows (e.g. "this match can no longer be answered").
-#[tauri::command]
-pub async fn respond_match<R: Runtime>(
-    app: tauri::AppHandle<R>,
-    match_id: i64,
-    accept: bool,
-) -> Result<MatchView, String> {
-    if match_id < 0 {
-        return Ok(respond_mock(&app, accept));
+/// Work friends list for the main window; emits "connections" when it changes.
+async fn poll_connections<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    client: &reqwest::Client,
+    config: &PollConfig,
+) {
+    let url = format!("{}/users/{}/connections", config.api_url, config.user_id);
+    let Ok(response) = client.get(&url).send().await else {
+        return; // the match poll right after logs connection errors
+    };
+    let Ok(list) = response.json::<serde_json::Value>().await else {
+        return;
+    };
+    let state = app.state::<MatchState>();
+    let mut current = state.connections.lock().unwrap();
+    if current.as_ref() != Some(&list) {
+        *current = Some(list.clone());
+        let _ = app.emit_to(crate::MAIN_LABEL, "connections", list);
     }
+}
+
+#[tauri::command]
+pub fn current_connections(state: tauri::State<MatchState>) -> Option<serde_json::Value> {
+    state.connections.lock().unwrap().clone()
+}
+
+/// POST to the backend and turn a non-2xx answer into its "detail" message.
+async fn post_json<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    path: String,
+    body: serde_json::Value,
+) -> Result<MatchView, String> {
     let config = app
         .state::<MatchState>()
         .config
@@ -126,13 +159,10 @@ pub async fn respond_match<R: Runtime>(
         .unwrap()
         .clone()
         .ok_or("match polling hasn't started")?;
-    let url = format!(
-        "{}/users/{}/matches/{}/respond",
-        config.api_url, config.user_id, match_id
-    );
+    let url = format!("{}/users/{}/{}", config.api_url, config.user_id, path);
     let response = reqwest::Client::new()
         .post(&url)
-        .json(&serde_json::json!({ "accept": accept }))
+        .json(&body)
         .send()
         .await
         .map_err(|err| err.to_string())?;
@@ -145,7 +175,50 @@ pub async fn respond_match<R: Runtime>(
             .unwrap_or_else(|| "request failed".into());
         return Err(detail);
     }
-    let view = response.json::<MatchView>().await.map_err(|err| err.to_string())?;
+    response.json::<MatchView>().await.map_err(|err| err.to_string())
+}
+
+/// Clicking an active work friend: start a match with them (my side already
+/// accepted) and show the popup, which waits for their answer.
+#[tauri::command]
+pub async fn join_connection<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    connection_id: i64,
+) -> Result<MatchView, String> {
+    let view = post_json(&app, format!("connections/{connection_id}/join"), serde_json::json!({})).await?;
+    app.state::<MatchState>().dismissed.lock().unwrap().remove(&view.match_id);
+    show_state(&app, view.clone());
+    crate::window::show_match_popup(&app);
+    Ok(view)
+}
+
+/// "Keep in touch?" after both accepted.
+#[tauri::command]
+pub async fn keep_match<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    match_id: i64,
+    keep: bool,
+) -> Result<MatchView, String> {
+    if match_id < 0 {
+        return Err("this is a mock match".into());
+    }
+    let view = post_json(&app, format!("matches/{match_id}/keep"), serde_json::json!({ "keep": keep })).await?;
+    show_state(&app, view.clone());
+    Ok(view)
+}
+
+/// Work together / Not now. Returns the updated match, or an error message
+/// the popup shows (e.g. "this match can no longer be answered").
+#[tauri::command]
+pub async fn respond_match<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    match_id: i64,
+    accept: bool,
+) -> Result<MatchView, String> {
+    if match_id < 0 {
+        return Ok(respond_mock(&app, accept));
+    }
+    let view = post_json(&app, format!("matches/{match_id}/respond"), serde_json::json!({ "accept": accept })).await?;
     show_state(&app, view.clone());
     Ok(view)
 }

@@ -2,6 +2,7 @@
 // a short `topic` and a one-sentence `task_summary` that a matched stranger
 // will read. Runs the local Llama model; nothing here leaves the device.
 use crate::buffer::{self, Buffer, Capture};
+use crate::collecting_data::app_tracker::{self, AppSession};
 use crate::llm::Llm;
 use crate::scrub::scrub;
 use crate::sharing::Sharing;
@@ -119,6 +120,7 @@ pub fn start(app: AppHandle) {
     let buffer = app.state::<Buffer>().inner().clone();
     let sharing = app.state::<Sharing>().inner().clone();
     let llm = app.state::<Llm>().inner().clone();
+    let db_path = crate::db::get_db_path(&app);
 
     tauri::async_runtime::spawn(async move {
         // The topic is remembered with the sharing epoch it was learned in, so a
@@ -130,7 +132,15 @@ pub fn start(app: AppHandle) {
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         loop {
             ticker.tick().await;
-            if let Some(summary) = run_once(&buffer, &sharing, &llm, &mut previous_topic, window_minutes).await {
+            // Apps in front during this window (collecting_data/app_tracker.rs).
+            let since = buffer::now_ms() - i64::from(window_minutes) * 60_000;
+            let apps = db_path
+                .as_deref()
+                .map(|path| app_tracker::recent_sessions(path, since))
+                .unwrap_or_default();
+            if let Some(summary) =
+                run_once(&buffer, &sharing, &llm, &apps, &mut previous_topic, window_minutes).await
+            {
                 let _ = app.emit("activity-summary", &summary);
                 crate::api::on_summary(&app, &summary);
             }
@@ -144,6 +154,7 @@ async fn run_once(
     buffer: &Buffer,
     sharing: &Sharing,
     llm: &Llm,
+    apps: &[AppSession],
     previous_topic: &mut Option<(u64, String)>,
     window_minutes: u32,
 ) -> Option<ActivitySummary> {
@@ -158,7 +169,7 @@ async fn run_once(
             return None;
         }
     };
-    if !captures.is_empty() {
+    if !captures.is_empty() || !apps.is_empty() {
         // If it isn't ready in time, chat() fails fast and the summary falls back.
         llm.wait_ready(READY_WAIT).await;
     }
@@ -166,7 +177,7 @@ async fn run_once(
         .as_ref()
         .filter(|(learned_in, _)| *learned_in == epoch)
         .map(|(_, topic)| topic.as_str());
-    let summary = summarize(&captures, hint, buffer::now_ms(), window_minutes, |prompt| {
+    let summary = summarize(&captures, apps, hint, buffer::now_ms(), window_minutes, |prompt| {
         let llm = llm.clone();
         async move { llm.chat(SYSTEM_PROMPT, &prompt, &SCHEMA).await }
     })
@@ -193,13 +204,14 @@ async fn run_once(
     Some(summary)
 }
 
-/// No captures → idle without calling the model. Otherwise the model gets two
+/// No captures and no app sessions → idle without calling the model. Otherwise the model gets two
 /// attempts; a transport error or unparseable reply counts as a failure, and
 /// two failures give the fallback.
 // `ask_model` takes the prompt by value and returns an owned future (rather
 // than being an async closure over &str) so the summarizer task stays Send.
 pub async fn summarize<F, Fut>(
     captures: &[Capture],
+    apps: &[AppSession],
     previous_topic: Option<&str>,
     now: i64,
     window_minutes: u32,
@@ -209,10 +221,10 @@ where
     F: FnMut(String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    if captures.is_empty() {
+    if captures.is_empty() && apps.is_empty() {
         return ActivitySummary::not_shareable(Source::Idle, now, window_minutes);
     }
-    let prompt = build_prompt(captures, previous_topic);
+    let prompt = build_prompt(captures, apps, previous_topic);
     for attempt in 1..=MODEL_ATTEMPTS {
         let output = ask_model(prompt.clone()).await.and_then(|reply| {
             serde_json::from_str::<ModelOutput>(&reply).map_err(|err| format!("bad JSON from the model: {err}"))
@@ -237,13 +249,18 @@ where
     ActivitySummary::not_shareable(Source::Fallback, now, window_minutes)
 }
 
-/// Newest first, one entry per page (its latest text), within MAX_PROMPT_CHARS.
-fn build_prompt(captures: &[Capture], previous_topic: Option<&str>) -> String {
+/// Apps in front (with time spent) first, then pages newest first, one entry
+/// per page (its latest text), within MAX_PROMPT_CHARS.
+fn build_prompt(captures: &[Capture], apps: &[AppSession], previous_topic: Option<&str>) -> String {
     let mut prompt = String::new();
     if let Some(topic) = previous_topic {
         prompt.push_str(&format!(
             "Previous topic: {topic} (reuse this exact label if the activity is the same)\n\n"
         ));
+    }
+    prompt.push_str(&apps_section(apps));
+    if captures.is_empty() {
+        return prompt;
     }
     prompt.push_str("Pages from the last few minutes, newest first:\n");
     let mut seen = HashSet::new();
@@ -269,6 +286,51 @@ fn build_prompt(captures: &[Capture], previous_topic: Option<&str>) -> String {
         prompt.push_str(&entry);
     }
     prompt
+}
+
+const MAX_APPS_CHARS: usize = 1500;
+
+/// "Apps in front in the last few minutes" lines, longest first, with repeats
+/// of the same app + window + document merged.
+fn apps_section(apps: &[AppSession]) -> String {
+    let mut merged: Vec<(String, i64)> = Vec::new();
+    for session in apps {
+        let mut line = session.app_name.clone();
+        if let Some(title) = &session.window_title {
+            line.push_str(&format!(": {title}"));
+        }
+        if let Some(document) = &session.document {
+            line.push_str(&format!(" [{document}]"));
+        }
+        let millis = (session.ended_at - session.started_at).max(0);
+        match merged.iter_mut().find(|(existing, _)| *existing == line) {
+            Some((_, total)) => *total += millis,
+            None => merged.push((line, millis)),
+        }
+    }
+    if merged.is_empty() {
+        return String::new();
+    }
+    merged.sort_by(|a, b| b.1.cmp(&a.1));
+    let mut section = String::from("Apps in front in the last few minutes, most time first:\n");
+    for (line, millis) in merged {
+        let entry = format!("- {} ({})\n", line, duration_label(millis));
+        if section.chars().count() + entry.chars().count() > MAX_APPS_CHARS {
+            break;
+        }
+        section.push_str(&entry);
+    }
+    section.push('\n');
+    section
+}
+
+fn duration_label(millis: i64) -> String {
+    let seconds = millis / 1000;
+    if seconds < 60 {
+        format!("{seconds} s")
+    } else {
+        format!("{} min", (seconds + 30) / 60)
+    }
 }
 
 fn clock_time(unix_ms: i64) -> String {
@@ -451,7 +513,7 @@ mod tests {
     #[tokio::test]
     async fn no_captures_is_idle_without_calling_the_model() {
         let mut calls = 0;
-        let summary = summarize(&[], None, NOW, 5, |_| {
+        let summary = summarize(&[], &[], None, NOW, 5, |_| {
             calls += 1;
             async { Err("unused".to_string()) }
         })
@@ -463,7 +525,7 @@ mod tests {
     #[tokio::test]
     async fn falls_back_after_a_failed_retry() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), None, NOW, 5, |_| {
+        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| {
             calls += 1;
             async { Err("connection refused".to_string()) }
         })
@@ -475,7 +537,7 @@ mod tests {
     #[tokio::test]
     async fn bad_json_twice_falls_back() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), None, NOW, 5, |_| {
+        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| {
             calls += 1;
             async { Ok("{\"topic\": \"LeetCode\"".to_string()) }
         })
@@ -487,7 +549,7 @@ mod tests {
     #[tokio::test]
     async fn succeeds_on_the_retry() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), None, NOW, 5, |prompt| {
+        let summary = summarize(&leetcode(), &[], None, NOW, 5, |prompt| {
             calls += 1;
             let first_try = calls == 1;
             async move {
@@ -508,7 +570,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejected_output_is_blank_and_not_shareable() {
-        let summary = summarize(&leetcode(), None, NOW, 5, |_| async {
+        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| async {
             Ok(reply("Job hunting", "Emailing recruiter jane@example.com"))
         })
         .await;
@@ -522,7 +584,7 @@ mod tests {
             capture(2, "www.zillow.com", "/oakland-ca/rentals/", "Oakland Rentals", &"z".repeat(5_000)),
             capture(3, "leetcode.com", "/problems/course-schedule/", "Course Schedule - LeetCode", "new text"),
         ];
-        let prompt = build_prompt(&captures, Some("LeetCode"));
+        let prompt = build_prompt(&captures, &[], Some("LeetCode"));
 
         assert!(prompt.starts_with("Previous topic: LeetCode"));
         let leetcode_at = prompt.find("leetcode.com/problems/course-schedule | Course Schedule").unwrap();
@@ -536,6 +598,6 @@ mod tests {
         let many: Vec<_> = (0..20)
             .map(|id| capture(id, "example.com", &format!("/page/{id}"), "Page", &"x".repeat(800)))
             .collect();
-        assert!(build_prompt(&many, None).chars().count() < MAX_PROMPT_CHARS + 100);
+        assert!(build_prompt(&many, &[], None).chars().count() < MAX_PROMPT_CHARS + 100);
     }
 }

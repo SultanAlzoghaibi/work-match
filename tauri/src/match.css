@@ -143,3 +143,12 @@ button.secondary:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.card-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 8px;
+}

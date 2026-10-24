@@ -70,3 +70,39 @@ def score_candidates(my_summary: str, candidates: list[dict]) -> dict:
         for index, candidate in enumerate(candidates, start=1)
         if f"c{index}" in answers
     }
+
+
+def score_topics(my_summary: str, topics: list[str]) -> list[float]:
+    """For each connection topic, P(my current task is about that topic).
+
+    One request; used on push to light up connections (is_working_on_connections).
+    """
+    key = os.environ.get("JEV_API")
+    if not key:
+        raise JevError("JEV_API is not set in backend/fastapi-sultan/.env")
+    if not topics:
+        return []
+
+    questions = {
+        f"t{index}": {
+            "type": "noul",
+            "instructions": f'Is Me currently working on the topic "{topic}"?',
+            "criteria": {
+                "true": f'The task is about "{topic}" or a closely related activity, even if worded differently.',
+                "false": f'The task is about something other than "{topic}".',
+            },
+        }
+        for index, topic in enumerate(topics)
+    }
+    try:
+        response = httpx.post(
+            JEV_URL,
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": JEV_MODEL, "state": [f"Me: {my_summary}"], "questions": questions},
+            timeout=30,
+        )
+        response.raise_for_status()
+        answers = response.json()["answers"]
+    except (httpx.HTTPError, KeyError, ValueError) as err:
+        raise JevError(f"Jev request failed: {err}") from err
+    return [float(answers.get(f"t{index}", {}).get("noul", 0.0)) for index in range(len(topics))]

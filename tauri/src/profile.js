@@ -1,7 +1,11 @@
 import { getDb } from "./db.js";
+import { MOCK_USER_ID } from "./api.js";
+
+/// Demo names: instance 1 (yarn dev1) is sultan1, instance 2 (yarn dev2) is James2.
+export const DEFAULT_NAME = MOCK_USER_ID.endsWith("1") ? "James2" : "sultan1";
 
 // The single curr_user_profile row (id = 1). token NULL = signed out.
-export const PROFILE_FIELDS = ["name", "school", "bio", "age_group", "country", "discord_handle"];
+export const PROFILE_FIELDS = ["name", "school", "career", "bio", "age_group", "country", "discord_handle"];
 
 export const AGE_GROUPS = [
   ["under_18", "Under 18"],
@@ -13,6 +17,8 @@ export const AGE_GROUPS = [
 
 export async function loadProfile() {
   const db = await getDb();
+  // Rename profiles left over from before the demo names existed.
+  await db.execute("UPDATE curr_user_profile SET name = $1 WHERE id = 1 AND name LIKE 'New User%'", [DEFAULT_NAME]);
   const rows = await db.select("SELECT * FROM curr_user_profile WHERE id = 1");
   return rows[0] ?? null;
 }
@@ -23,9 +29,10 @@ export async function mockLogin() {
   const db = await getDb();
   const token = `mock-${crypto.randomUUID()}`;
   await db.execute(
-    `INSERT INTO curr_user_profile (id, token, name) VALUES (1, $1, 'New User')
-     ON CONFLICT (id) DO UPDATE SET token = $1, name = COALESCE(name, 'New User')`,
-    [token],
+    `INSERT INTO curr_user_profile (id, token, name) VALUES (1, $1, $2)
+     ON CONFLICT (id) DO UPDATE SET token = $1,
+       name = CASE WHEN name IS NULL OR name LIKE 'New User%' THEN $2 ELSE name END`,
+    [token, DEFAULT_NAME],
   );
 }
 
@@ -42,9 +49,29 @@ export async function saveProfile(profile) {
   });
   await db.execute(
     `UPDATE curr_user_profile
-     SET name = $1, school = $2, bio = $3, age_group = $4, country = $5,
-         discord_handle = $6, sharing_enabled = $7
+     SET name = $1, school = $2, career = $3, bio = $4, age_group = $5, country = $6,
+         discord_handle = $7, sharing_enabled = $8
      WHERE id = 1`,
     [...values, profile.sharing_enabled ? 1 : 0],
+  );
+}
+
+export async function saveAvatarUrl(url) {
+  const db = await getDb();
+  await db.execute("UPDATE curr_user_profile SET avatar_url = $1 WHERE id = 1", [url]);
+}
+
+/// Center-crop and resize an image file to a size×size JPEG blob.
+export async function resizeImage(file, size = 256) {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  canvas
+    .getContext("2d")
+    .drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("could not read image"))), "image/jpeg", 0.85),
   );
 }

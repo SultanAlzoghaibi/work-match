@@ -8,7 +8,11 @@
   </head>
   <body>
     <!-- Overlay title bar: traffic lights sit on top; this strip drags the window. -->
-    <div class="titlebar" data-tauri-drag-region></div>
+    <header class="titlebar" data-tauri-drag-region>
+      <span id="titlebar-user" class="titlebar-user" data-tauri-drag-region></span>
+      <span class="titlebar-title" data-tauri-drag-region>work-match</span>
+      <span id="titlebar-status" class="titlebar-status" data-tauri-drag-region></span>
+    </header>
     <main id="root"></main>
     <script type="module" src="/src/main.js"></script>
   </body>

@@ -1,12 +1,29 @@
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Response
+import httpx
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg import errors, sql
 
 from .db import connect
-from .matching import find_match
-from .schemas import CurrTask, MatchView, RespondBody, TaskPush, User, UserUpdate
+from .matching import (
+    active_connections,
+    clear_expired_pending,
+    find_match,
+    list_connections,
+    refresh_active_connections,
+)
+from .storage import upload_avatar
+from .schemas import (
+    Connection,
+    CurrTask,
+    KeepBody,
+    MatchView,
+    RespondBody,
+    TaskPush,
+    User,
+    UserUpdate,
+)
 
 app = FastAPI(title="work-match backend")
 
@@ -25,7 +42,7 @@ app.add_middleware(
 )
 
 USER_COLUMNS = sql.SQL(
-    "id, name, school, bio, discord_handle, age_group, country, sharing_enabled, created_at"
+    "id, name, school, career, bio, discord_handle, avatar_url, age_group, country, sharing_enabled, created_at"
 )
 
 
@@ -72,9 +89,47 @@ def update_user(user_id: UUID, update: UserUpdate) -> dict:
     return row
 
 
+AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+
+# PROFILE PICTURE: the file goes to Supabase Storage (bucket "avatars"), and
+# users.avatar_url stores its public URL. The app resizes to 256x256 first.
+@app.post("/users/{user_id}/avatar", response_model=User)
+def set_avatar(user_id: UUID, file: UploadFile = File(...)) -> dict:
+    if file.content_type not in AVATAR_TYPES:
+        raise HTTPException(415, "use a JPEG, PNG or WebP image")
+    data = file.file.read(AVATAR_MAX_BYTES + 1)
+    if len(data) > AVATAR_MAX_BYTES:
+        raise HTTPException(413, "image is over 2 MB")
+    get_user(user_id)   # 404 before uploading for a user that doesn't exist
+    try:
+        avatar_url = upload_avatar(user_id, data, file.content_type)
+    except httpx.HTTPError as err:
+        raise HTTPException(502, f"storage upload failed: {err}") from None
+    with connect() as conn:
+        row = conn.execute(
+            sql.SQL("update users set avatar_url = %s where id = %s returning {}").format(USER_COLUMNS),
+            (avatar_url, user_id),
+        ).fetchone()
+    return row
+
+
+@app.delete("/users/{user_id}/avatar", response_model=User)
+def clear_avatar(user_id: UUID) -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            sql.SQL("update users set avatar_url = null where id = %s returning {}").format(USER_COLUMNS),
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "user not found")
+    return row
+
+
 # PUSH (schema.sql): overwrite my curr_task, rewrite my
-# is_working_on_connections rows for connections on this topic, then run the
-# Jev match search for me (matching.py).
+# is_working_on_connections rows for connections whose topic Jev says matches
+# this task, then run the Jev match search for me (matching.py).
 @app.post("/users/{user_id}/push", response_model=CurrTask)
 def push_task(user_id: UUID, task: TaskPush) -> dict:
     topic = task.topic or "General"
@@ -91,20 +146,16 @@ def push_task(user_id: UUID, task: TaskPush) -> dict:
                 """,
                 (user_id, task.task_summary, task.topic),
             ).fetchone()
-            conn.execute("delete from is_working_on_connections where user_id = %s", (user_id,))
-            conn.execute(
-                """
-                insert into is_working_on_connections (connection_id, user_id)
-                select id, %s from connections where %s in (user_a, user_b) and topic = %s
-                """,
-                (user_id, user_id, task.topic),
-            )
+            conn.commit()
+            # Friends first: light up connections whose topic matches this task,
+            # then look for a new person.
+            connection_topics = refresh_active_connections(conn, user_id, task.task_summary)
             conn.commit()
             match = find_match(conn, user_id, task.task_summary, topic, task.filters)
     except errors.ForeignKeyViolation:
         raise HTTPException(404, "user not found") from None
-    print(f"[push] {user_id} topic={topic!r} -> {match}")
-    return {**row, "match": match}
+    print(f"[push] {user_id} topic={topic!r} -> {match} connections={connection_topics}")
+    return {**row, "match": match, "connection_topics": connection_topics}
 
 
 # QUIT / PAUSE (schema.sql): stop being matchable. The app calls this when a
@@ -124,7 +175,11 @@ select m.id as match_id, m.topic, m.score, m.created_at,
        ('declined' not in (m.a_status, m.b_status)
         and 'pending' in (m.a_status, m.b_status)
         and m.created_at < now() - interval '2 minutes') as expired,
-       u.id as other_id, u.name, u.school, u.bio, u.age_group, u.country, u.discord_handle,
+       case when m.user_a = %(me)s then m.a_keep else m.b_keep end as my_keep,
+       case when m.user_a = %(me)s then m.b_keep else m.a_keep end as their_keep,
+       exists (select 1 from connections c
+               where c.user_a = m.user_a and c.user_b = m.user_b and c.topic = m.topic) as connected,
+       u.id as other_id, u.name, u.school, u.career, u.bio, u.age_group, u.country, u.discord_handle, u.avatar_url,
        t.task_summary
 from matches m
 join users u on u.id = case when m.user_a = %(me)s then m.user_b else m.user_a end
@@ -136,11 +191,12 @@ where %(me)s in (m.user_a, m.user_b)
 def _match_view(row: dict) -> dict:
     other = {
         "id": row["other_id"],
-        **{key: row[key] for key in ("name", "school", "bio", "age_group", "country",
-                                     "discord_handle", "task_summary")},
+        **{key: row[key] for key in ("name", "school", "career", "bio", "age_group", "country",
+                                     "discord_handle", "avatar_url", "task_summary")},
     }
     view = {key: row[key] for key in ("match_id", "topic", "score", "created_at",
-                                      "my_status", "their_status", "expired")}
+                                      "my_status", "their_status", "expired",
+                                      "my_keep", "their_keep", "connected")}
     return {**view, "other": other}
 
 
@@ -182,4 +238,86 @@ def respond(user_id: UUID, match_id: int, body: RespondBody) -> dict:
         raise HTTPException(404, "match not found")
     if updated is None:
         raise HTTPException(409, "this match can no longer be answered")
+    return _match_view(row)
+
+
+
+# KEEP IN TOUCH: after both accept, each side answers "keep in touch?". When
+# both say yes, create the connection on the match's topic.
+@app.post("/users/{user_id}/matches/{match_id}/keep", response_model=MatchView)
+def keep_in_touch(user_id: UUID, match_id: int, body: KeepBody) -> dict:
+    with connect() as conn:
+        updated = conn.execute(
+            """
+            update matches set
+                a_keep = case when user_a = %(me)s then %(keep)s else a_keep end,
+                b_keep = case when user_b = %(me)s then %(keep)s else b_keep end
+            where id = %(id)s
+              and %(me)s in (user_a, user_b)
+              and a_status = 'accepted' and b_status = 'accepted'
+              and (case when user_a = %(me)s then a_keep else b_keep end) is null
+            returning user_a, user_b, topic, a_keep, b_keep
+            """,
+            {"me": user_id, "keep": body.keep, "id": match_id},
+        ).fetchone()
+        if updated is not None and updated["a_keep"] and updated["b_keep"]:
+            conn.execute(
+                """
+                insert into connections (user_a, user_b, topic, match_id)
+                values (%s, %s, %s, %s)
+                on conflict (user_a, user_b, topic) do nothing
+                """,
+                (updated["user_a"], updated["user_b"], updated["topic"], match_id),
+            )
+        row = conn.execute(MATCH_VIEW_SQL + " and m.id = %(id)s", {"me": user_id, "id": match_id}).fetchone()
+    if row is None:
+        raise HTTPException(404, "match not found")
+    if updated is None:
+        raise HTTPException(409, "you can answer only once, after you both accepted")
+    return _match_view(row)
+
+
+# ACTIVE CONNECTIONS (every ~3 s from the app): which of my connections are
+# working on our topic right now, so the app can light them up.
+@app.get("/users/{user_id}/connections/active", response_model=list[Connection])
+def get_active_connections(user_id: UUID) -> list[dict]:
+    with connect() as conn:
+        return active_connections(conn, user_id)
+
+
+# WORK FRIENDS (every ~3 s from the app): all my connections, active first.
+@app.get("/users/{user_id}/connections", response_model=list[Connection])
+def get_connections(user_id: UUID) -> list[dict]:
+    with connect() as conn:
+        return list_connections(conn, user_id)
+
+
+# JOIN A FRIEND: clicking an active friend starts a match with them on the
+# connection's topic, with my side already accepted. They get the usual popup.
+@app.post("/users/{user_id}/connections/{connection_id}/join", response_model=MatchView)
+def join_connection(user_id: UUID, connection_id: int) -> dict:
+    with connect() as conn:
+        connection = conn.execute(
+            "select user_a, user_b, topic from connections where id = %s and %s in (user_a, user_b)",
+            (connection_id, user_id),
+        ).fetchone()
+        if connection is None:
+            raise HTTPException(404, "connection not found")
+        friend = connection["user_b"] if connection["user_a"] == user_id else connection["user_a"]
+        clear_expired_pending(conn, user_id, friend)
+        match = conn.execute(
+            "select create_match(%s, %s, %s, 1.0::real) as id", (user_id, friend, connection["topic"])
+        ).fetchone()
+        if match["id"] is None:
+            raise HTTPException(409, "one of you already has a match waiting for an answer")
+        conn.execute(
+            """
+            update matches set
+                a_status = case when user_a = %(me)s then 'accepted' else a_status end,
+                b_status = case when user_b = %(me)s then 'accepted' else b_status end
+            where id = %(id)s
+            """,
+            {"me": user_id, "id": match["id"]},
+        )
+        row = conn.execute(MATCH_VIEW_SQL + " and m.id = %(id)s", {"me": user_id, "id": match["id"]}).fetchone()
     return _match_view(row)

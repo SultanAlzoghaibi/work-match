@@ -29,12 +29,26 @@ export function updateUser(userId, profile) {
   return request("PATCH", `/users/${userId}`, {
     name: blankToNull(profile.name),
     school: blankToNull(profile.school),
+    career: blankToNull(profile.career),
     bio: blankToNull(profile.bio),
     discord_handle: blankToNull(profile.discord_handle),
     age_group: blankToNull(profile.age_group),
     country: blankToNull(profile.country),
     sharing_enabled: Boolean(profile.sharing_enabled),
   });
+}
+
+/// POST /users/{id}/avatar: upload a profile picture (a JPEG blob). Returns the
+/// updated user, whose avatar_url points at Supabase Storage.
+export async function uploadAvatar(userId, blob) {
+  const form = new FormData();
+  form.append("file", blob, "avatar.jpg");
+  const response = await fetch(`${API_URL}/users/${userId}/avatar`, { method: "POST", body: form });
+  if (!response.ok) {
+    const detail = await response.json().then((data) => data.detail, () => null);
+    throw new Error(`${response.status} ${typeof detail === "string" ? detail : response.statusText}`);
+  }
+  return response.json();
 }
 
 /// POST /users/{id}/push: overwrite what this user is working on (curr_task),

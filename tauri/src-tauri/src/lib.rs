@@ -1,7 +1,9 @@
 mod api;
 mod buffer;
 mod capture_server;
+mod collecting_data;
 mod db;
+mod friend_finding;
 mod llm;
 mod match_popup;
 mod scrub;
@@ -47,6 +49,24 @@ pub fn run() {
             sql: include_str!("migrations/002_profile_fields.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "avatar",
+            sql: include_str!("migrations/003_avatar.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "career",
+            sql: include_str!("migrations/004_career.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "app_sessions",
+            sql: include_str!("migrations/005_app_sessions.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     let builder = tauri::Builder::default()
@@ -62,6 +82,7 @@ pub fn run() {
 
     builder
         .manage(match_popup::MatchState::default())
+        .manage(friend_finding::FriendFinding::default())
         .setup(|app| {
             // Accessory: no dock icon, lives only in the menu bar.
             #[cfg(target_os = "macos")]
@@ -87,6 +108,10 @@ pub fn run() {
                 .id("sharing")
                 .checked(app.state::<sharing::Sharing>().is_on())
                 .build(app)?;
+            let friends_item = tauri::menu::CheckMenuItemBuilder::new("Turn on friend finding")
+                .id("friend_finding")
+                .checked(false)
+                .build(app)?;
             let open_item = tauri::menu::MenuItemBuilder::new("Open")
                 .id("open")
                 .build(app)?;
@@ -97,16 +122,16 @@ pub fn run() {
                 .item(&header_item)
                 .separator()
                 .item(&sharing_item)
+                .item(&friends_item)
                 .separator()
                 .item(&open_item)
                 .item(&quit_item)
                 .build()?;
             app.manage(sharing::SharingMenuItem(sharing_item));
+            app.manage(friend_finding::FriendFindingMenuItem(friends_item));
 
-            let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
-                .expect("tray icon load failed");
-            TrayIconBuilder::new()
-                .icon(tray_icon)
+            TrayIconBuilder::with_id(friend_finding::TRAY_ID)
+                .icon(friend_finding::base_icon())
                 .tooltip("work-match")
                 .menu(&menu)
                 // Left click opens the main window; right click shows the menu.
@@ -116,6 +141,10 @@ pub fn run() {
                     "sharing" => {
                         let on = !app.state::<sharing::Sharing>().is_on();
                         sharing::set(app, on);
+                    }
+                    "friend_finding" => {
+                        let on = !app.state::<friend_finding::FriendFinding>().is_on();
+                        friend_finding::set(app, on);
                     }
                     "open" => window::open_main_window(app),
                     "quit" => app.exit(0),
@@ -160,9 +189,15 @@ pub fn run() {
             match_popup::respond_match,
             match_popup::dismiss_match,
             match_popup::start_match_polling,
+            match_popup::current_connections,
+            match_popup::join_connection,
+            match_popup::keep_match,
+            friend_finding::get_friend_finding,
+            friend_finding::set_friend_finding,
             sharing::get_sharing,
             sharing::set_sharing,
             summarizer::get_last_summary,
+            collecting_data::app_tracker::get_app_sessions,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -192,6 +227,8 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     app.manage(sharing);
     app.manage(llm::start(app.handle()));
     summarizer::start(app.handle().clone());
+    // Which app / window is in front, while sharing is on (collecting_data/).
+    collecting_data::app_tracker::start(app.handle().clone());
     Ok(())
 }
 

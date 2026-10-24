@@ -14,14 +14,22 @@
 --   match popup expires : 2 min
 --   active row expires  : 11 min without a push (about 2 missed pushes = app gone)
 
+-- Profile pictures live in Supabase Storage, not in a table. One-time setup in the
+-- dashboard: Storage -> New bucket "avatars", public, 2 MB limit, image/jpeg,
+-- image/png, image/webp. The backend uploads {user_id}.jpg with the service-role key.
+-- Existing DB: alter table users add column avatar_url text;
+--              alter table users add column career text;
+
 -- 1. Who someone is. Permanent.
 create table users (
     id              uuid        primary key default gen_random_uuid(),   -- the app may also pick it
     token           text        not null unique,                 -- TODO: store a hash
     name            text        not null,
     school          text,
+    career          text,                                        -- e.g. 'Software engineer', 'CS student'
     bio             text,                                        -- shown in match popup
     discord_handle  text,                                        -- used to start the call
+    avatar_url      text,                                        -- public URL in Storage bucket 'avatars'; null = show initial
     age_group       text        check (age_group in ('under_18','18_24','25_34','35_44','45_plus')),
     country         char(2),                                     -- ISO code, e.g. 'CA'
     sharing_enabled boolean     not null default false,
@@ -48,6 +56,8 @@ create table matches (
     a_status   text        not null default 'pending' check (a_status in ('pending','accepted','declined')),
     b_status   text        not null default 'pending' check (b_status in ('pending','accepted','declined')),
     created_at timestamptz not null default now(),               -- popup expires after 2 min
+    a_keep     boolean,                                          -- "keep in touch?" after both accept;
+    b_keep     boolean,                                          --   NULL until answered, both true -> connection
     check (user_a < user_b)                                      -- store each pair one way
 );
 

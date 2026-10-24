@@ -2,7 +2,7 @@
 // ever leaves the laptop, and only when the summary is shareable.
 use crate::summarizer::ActivitySummary;
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 /// Exactly the body of the backend push (see PUSH in backend/schema.sql).
 #[derive(Debug, PartialEq, Serialize)]
@@ -20,14 +20,51 @@ pub fn push_payload(summary: &ActivitySummary) -> Option<PushPayload<'_>> {
     })
 }
 
-pub fn on_summary(_app: &AppHandle, summary: &ActivitySummary) {
+/// Push a shareable summary to the backend (POST /users/{id}/push in
+/// backend/fastapi-sultan). The backend saves it as curr_task, lights up
+/// matching work friends and runs the match search; a match then reaches the
+/// popup through the 3 s poll in match_popup.rs.
+pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
     println!(
         "[api] summary source={:?} shareable={} topic={:?}",
         summary.source, summary.shareable, summary.topic
     );
-    if let Some(_payload) = push_payload(summary) {
-        // TODO: push {task_summary, topic} to backend
-    }
+    let Some(payload) = push_payload(summary) else {
+        return;
+    };
+    let Some((api_url, user_id)) = crate::match_popup::backend_target(app) else {
+        println!("[api] not pushed: the main window hasn't loaded the user yet");
+        return;
+    };
+    let Ok(body) = serde_json::to_value(&payload) else {
+        return;
+    };
+    let url = format!("{api_url}/users/{user_id}/push");
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let result = async {
+            reqwest::Client::new()
+                .post(&url)
+                .json(&body)
+                .send()
+                .await?
+                .error_for_status()?
+                .json::<serde_json::Value>()
+                .await
+        }
+        .await;
+        match result {
+            Ok(saved) => {
+                println!(
+                    "[api] pushed topic={} match={} connections={}",
+                    saved["topic"], saved["match"]["match_id"], saved["connection_topics"]
+                );
+                // The main window shows what was shared and the match result.
+                let _ = app.emit_to(crate::MAIN_LABEL, "activity-pushed", saved);
+            }
+            Err(err) => eprintln!("[api] push failed: {err}"),
+        }
+    });
 }
 
 #[cfg(test)]

@@ -23,6 +23,7 @@
         "resizable": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 },
         "backgroundColor": "#dceeff",
         "visible": false,
         "url": "index.html"

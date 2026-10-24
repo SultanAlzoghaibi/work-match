@@ -43,6 +43,7 @@ function el(tag, attrs = {}, ...children) {
 function personCard(other) {
   const rows = [
     ["School", other.school],
+    ["Career", other.career],
     ["Bio", other.bio],
     ["Age", AGE_LABELS[other.age_group]],
     ["Country", other.country],
@@ -51,7 +52,12 @@ function personCard(other) {
   return el(
     "div",
     { class: "card" },
-    el("div", { class: "card-name" }, other.name),
+    el(
+      "div",
+      { class: "card-name" },
+      other.avatar_url ? el("img", { class: "card-avatar", src: other.avatar_url, alt: "" }) : null,
+      other.name,
+    ),
     ...rows.map(([label, value]) =>
       el("div", { class: "card-row" }, el("span", {}, label), el("span", {}, value)),
     ),
@@ -72,6 +78,70 @@ function show(...nodes) {
   popup.replaceChildren(...nodes.filter((node) => node != null));
 }
 
+/// Both accepted. A match with a stranger then asks "keep in touch?"; both
+/// yes makes you work friends. A match started from a friend is already
+/// connected, so it skips the question.
+function renderAccepted(view) {
+  const { other } = view;
+  const name = other.name;
+  const topic = el("strong", {}, view.topic);
+
+  if (view.connected && view.my_keep && view.their_keep) {
+    show(
+      el("div", { class: "eyebrow" }, "🤝 Work friends"),
+      el("p", { class: "intro" }, "You and ", el("strong", {}, name), " are connected on ", topic, "."),
+      el("p", { class: "meta" }, "You'll see them in Work friends whenever they're on it."),
+      personCard(other),
+      closeButton(view),
+    );
+  } else if (view.connected) {
+    show(
+      el("div", { class: "eyebrow" }, "🎉 Let's go"),
+      el("p", { class: "intro" }, "You and ", el("strong", {}, name), " are working on ", topic, " together."),
+      personCard(other),
+      closeButton(view),
+    );
+  } else if (view.my_keep === false || view.their_keep === false) {
+    show(
+      el("div", { class: "eyebrow" }, "Thanks for working together"),
+      el(
+        "p",
+        { class: "intro" },
+        view.my_keep === false ? "No connection this time." : `${name} chose not to connect this time.`,
+      ),
+      closeButton(view),
+    );
+  } else if (view.my_keep) {
+    show(
+      el("div", { class: "eyebrow" }, "🎉 It's a match"),
+      el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to say if they want to keep in touch…"),
+      personCard(other),
+    );
+  } else {
+    const error = el("p", { class: "error" });
+    const keep = async (answer) => {
+      error.textContent = "";
+      try {
+        await invoke("keep_match", { matchId: view.match_id, keep: answer });
+      } catch (err) {
+        error.textContent = String(err);
+      }
+    };
+    show(
+      el("div", { class: "eyebrow" }, "🎉 It's a match"),
+      el("p", { class: "intro" }, "You both accepted! Keep in touch with ", el("strong", {}, name), " on ", topic, "?"),
+      el("p", { class: "meta" }, "If you both say yes, you'll see when they're working on it."),
+      error,
+      el(
+        "div",
+        { class: "actions" },
+        el("button", { class: "secondary", onclick: () => keep(false) }, "Not now"),
+        el("button", { class: "primary", onclick: () => keep(true) }, "Keep in touch"),
+      ),
+    );
+  }
+}
+
 function render(view) {
   if (!view) {
     show();
@@ -81,12 +151,7 @@ function render(view) {
   const name = other.name;
 
   if (view.my_status === "accepted" && view.their_status === "accepted") {
-    show(
-      el("div", { class: "eyebrow" }, "🎉 It's a match"),
-      el("p", { class: "intro" }, "You both accepted! Time to work together on ", el("strong", {}, view.topic), "."),
-      personCard(other),
-      closeButton(view),
-    );
+    renderAccepted(view);
   } else if (view.their_status === "declined") {
     show(
       el("div", { class: "eyebrow" }, "Match declined"),

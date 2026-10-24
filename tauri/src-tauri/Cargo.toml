@@ -38,3 +38,6 @@ tower = { version = "0.5", features = ["util"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
+# collecting_data/app_tracker.rs: focused window title + document via Accessibility.
+accessibility-sys = "0.2"
+core-foundation = "0.10"

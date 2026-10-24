@@ -49,6 +49,24 @@ limit %(limit)s
 """
 
 
+def clear_expired_pending(conn, user_1: UUID, user_2: UUID) -> None:
+    """Drop this pair's popups that expired with nobody answering.
+
+    uq_matches_pending_pair allows one both-pending match per pair and can't
+    know about the 2-minute expiry, so an ignored popup would block the pair
+    forever.
+    """
+    conn.execute(
+        """
+        delete from matches
+        where user_a = least(%(a)s, %(b)s) and user_b = greatest(%(a)s, %(b)s)
+          and a_status = 'pending' and b_status = 'pending'
+          and created_at < now() - interval '2 minutes'
+        """,
+        {"a": user_1, "b": user_2},
+    )
+
+
 def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
     """Run the search for `me` right after their push. Returns a MatchResult dict."""
     result = {"match_id": None, "other_name": None, "scores": [], "skipped_reason": None}
@@ -99,6 +117,7 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
     for user_id, score in ranked:
         if score < _threshold():
             break
+        clear_expired_pending(conn, me, user_id)
         row = conn.execute(
             "select create_match(%s, %s, %s, %s::real) as id", (me, user_id, topic, score)
         ).fetchone()
@@ -108,3 +127,84 @@ def find_match(conn, me: UUID, my_summary: str, topic: str, filters) -> dict:
             result["other_name"] = names[user_id]
             break
     return result
+
+
+def _active_seconds() -> int:
+    return int(os.environ.get("ACTIVE_SECONDS", "660"))
+
+
+def refresh_active_connections(conn, me: UUID, my_summary: str) -> list[dict]:
+    """Light up my connections whose topic matches what I'm doing now.
+
+    Rewrites my is_working_on_connections rows: a row per connection whose
+    topic Jev scores at or above MATCH_THRESHOLD, nothing for the rest (so
+    switching tasks turns the old light off). Returns [{topic, score}].
+    """
+    connections = conn.execute(
+        "select id, topic from connections where %s in (user_a, user_b)", (me,)
+    ).fetchall()
+    conn.execute("delete from is_working_on_connections where user_id = %s", (me,))
+    if not connections:
+        return []
+
+    # Score each distinct topic once (several friends can share a topic).
+    topics = sorted({row["topic"] for row in connections})
+    try:
+        scores = dict(zip(topics, jev.score_topics(my_summary, topics)))
+    except jev.JevError as err:
+        print(f"[active] {err}")
+        return []
+
+    for row in connections:
+        if scores[row["topic"]] >= _threshold():
+            conn.execute(
+                "insert into is_working_on_connections (connection_id, user_id) values (%s, %s)",
+                (row["id"], me),
+            )
+    return [{"topic": topic, "score": round(score, 3)} for topic, score in scores.items()]
+
+
+FRIEND_COLUMNS = ("name", "school", "career", "bio", "age_group", "country",
+                  "discord_handle", "avatar_url", "task_summary")
+
+CONNECTIONS_SQL = """
+select c.id as connection_id, c.topic, c.created_at,
+       w.seen_at,
+       u.id as friend_id, u.name, u.school, u.career, u.bio, u.age_group, u.country,
+       u.discord_handle, u.avatar_url, t.task_summary
+from connections c
+join users u on u.id = case when c.user_a = %(me)s then c.user_b else c.user_a end
+left join is_working_on_connections w on w.connection_id = c.id and w.user_id = u.id
+left join curr_task t on t.user_id = u.id
+where %(me)s in (c.user_a, c.user_b)
+order by (w.seen_at is null), w.seen_at desc, u.name
+"""
+
+
+def _drop_stale_active_rows(conn) -> None:
+    # Laptops that stopped pushing (crash, sleep) drop off after ACTIVE_SECONDS.
+    conn.execute(
+        "delete from is_working_on_connections where seen_at < now() - make_interval(secs => %s)",
+        (_active_seconds(),),
+    )
+
+
+def _connection_view(row: dict) -> dict:
+    return {
+        "connection_id": row["connection_id"],
+        "topic": row["topic"],
+        "active": row["seen_at"] is not None,
+        "seen_at": row["seen_at"],
+        "friend": {"id": row["friend_id"], **{key: row[key] for key in FRIEND_COLUMNS}},
+    }
+
+
+def list_connections(conn, me: UUID) -> list[dict]:
+    """All my connections; the ones working on our topic right now come first."""
+    _drop_stale_active_rows(conn)
+    return [_connection_view(row) for row in conn.execute(CONNECTIONS_SQL, {"me": me}).fetchall()]
+
+
+def active_connections(conn, me: UUID) -> list[dict]:
+    """My connections whose other person is working on our topic right now."""
+    return [view for view in list_connections(conn, me) if view["active"]]

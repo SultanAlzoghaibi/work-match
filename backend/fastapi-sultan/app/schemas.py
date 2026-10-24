@@ -13,8 +13,10 @@ class User(BaseModel):
     id: UUID
     name: str
     school: str | None
+    career: str | None
     bio: str | None
     discord_handle: str | None
+    avatar_url: str | None
     age_group: AgeGroup | None
     country: str | None
     sharing_enabled: bool
@@ -26,6 +28,7 @@ class UserUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=60)
     school: str | None = Field(default=None, max_length=80)
+    career: str | None = Field(default=None, max_length=80)
     bio: str | None = Field(default=None, max_length=120)
     discord_handle: str | None = Field(default=None, max_length=40)
     age_group: AgeGroup | None = None
@@ -68,12 +71,18 @@ class MatchResult(BaseModel):
     skipped_reason: str | None                   # why no search ran / nothing scored
 
 
+class TopicScore(BaseModel):
+    topic: str
+    score: float
+
+
 class CurrTask(BaseModel):
     user_id: UUID
     task_summary: str
     topic: str | None
     pushed_at: datetime
     match: MatchResult
+    connection_topics: list[TopicScore]          # my connections' topics vs this task
 
 
 MatchStatus = Literal["pending", "accepted", "declined"]
@@ -85,10 +94,12 @@ class OtherPerson(BaseModel):
     id: UUID
     name: str
     school: str | None
+    career: str | None
     bio: str | None
     age_group: AgeGroup | None
     country: str | None
     discord_handle: str | None
+    avatar_url: str | None
     task_summary: str | None
 
 
@@ -100,8 +111,25 @@ class MatchView(BaseModel):
     my_status: MatchStatus
     their_status: MatchStatus
     expired: bool                                # still undecided after 2 min
+    my_keep: bool | None                         # "keep in touch?" after both accept
+    their_keep: bool | None
+    connected: bool                              # a connection exists for this pair + topic
     other: OtherPerson
 
 
 class RespondBody(BaseModel):
     accept: bool
+
+
+class KeepBody(BaseModel):
+    keep: bool
+
+
+class Connection(BaseModel):
+    """One of my connections (work friends) on a topic."""
+
+    connection_id: int
+    topic: str
+    active: bool                                 # friend is working on this topic right now
+    seen_at: datetime | None                     # their last push on this topic, if active
+    friend: OtherPerson

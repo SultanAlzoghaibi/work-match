@@ -52,14 +52,69 @@ body {
 .titlebar {
   position: fixed;
   inset: 0 0 auto 0;
-  height: 32px;
+  height: 40px;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Leave room for the traffic lights on the left. */
+  padding: 0 16px 0 80px;
+  background: var(--color-paper-white);
+  border-bottom: var(--outline);
+  cursor: grab;
+}
+
+.titlebar:active {
+  cursor: grabbing;
+}
+
+.titlebar-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: var(--tracking-label);
+}
+
+.titlebar-user {
+  position: absolute;
+  left: 80px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: var(--text-body);
+}
+
+.titlebar-user .avatar.mini {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  border-width: 1px;
+}
+
+/* Let drags on the picture fall through to the title bar. */
+.titlebar-user img {
+  pointer-events: none;
+}
+
+.titlebar-status {
+  position: absolute;
+  right: 16px;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  padding: 3px 10px;
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  background: var(--color-soft-mist);
+}
+
+.titlebar-status.on {
+  background: var(--color-mint-pop);
 }
 
 #root {
   height: 100%;
   box-sizing: border-box;
-  padding: 48px 32px 24px;
+  padding: 64px 32px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -261,6 +316,19 @@ footer {
   background: var(--color-lavender);
 }
 
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.photo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .who {
   min-width: 0;
   padding-right: 48px; /* room for the header sticker */
@@ -449,4 +517,133 @@ input[type="checkbox"]:checked::after {
   border-top: none;
   border-right: none;
   transform: translateY(-1px) rotate(-45deg);
+}
+
+/* Click-to-edit fields on the profile view. */
+.editable,
+.row.editable .value {
+  cursor: text;
+  border-radius: 6px;
+}
+
+.editable:hover,
+.row.editable .value:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.inline-input {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  border: var(--outline);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.friend-finding {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* --- Tabs: Work friends / Your profile ------------------------------------ */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tab-body {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-body > * {
+  flex-shrink: 0;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 0.8;
+  text-transform: uppercase;
+}
+
+/* --- Work friends ---------------------------------------------------------- */
+
+.friends {
+  margin-top: 16px;
+  padding: 16px;
+  border: var(--outline);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-white);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friends-list .label {
+  margin-top: 4px;
+}
+
+.friends-empty {
+  font-size: var(--text-caption);
+}
+
+.friend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: var(--outline);
+  border-radius: var(--radius-card);
+}
+
+.friend.online {
+  background: var(--color-mint-pop);
+}
+
+.friend.offline {
+  background: var(--color-soft-mist);
+  opacity: 0.75;
+}
+
+.friend .avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+}
+
+.friend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.friend-name {
+  font-weight: 700;
+}
+
+.friend-topic {
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.friend-task {
+  margin-top: 2px;
+  font-size: var(--text-caption);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
