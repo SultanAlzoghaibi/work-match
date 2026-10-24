@@ -19,13 +19,26 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::time::MissedTickBehavior;
 
 const SYSTEM_PROMPT: &str = r#"You describe what a person is working on so they can be matched with a stranger doing
-similar work. Read the captured page text from the last few minutes and output ONLY the
-JSON object.
-"topic": 1 to 3 words naming the activity, reusing common labels when they fit:
-LeetCode, Job hunting, Apartment hunting, Coursework, Studying, Figma design, Writing,
-or a course name like "CS 61B".
-"task_summary": one sentence, at most 120 characters, that a stranger will read, e.g.
-"Working through graph problems on LeetCode".
+similar work. Read the apps and pages from the last few minutes and output ONLY the JSON object.
+"topic": the kind of activity, picked from the allowed list. Decide by what the person is
+doing, not by the tools, commands or apps on screen:
+- Coding: writing, debugging or setting up software, including reading its docs and tutorials
+- Web development: websites, web apps, frontends, backends and APIs
+- App development: mobile or desktop apps
+- Data science: analyzing or cleaning data, notebooks, statistics
+- Machine learning: building, training or studying ML models
+- Design: UI, product or graphic design; Figma design when it's in Figma
+- Writing: essays, reports, theses, applications and other writing
+- Research: academic research and reading papers (not reading docs while coding)
+- Studying: learning or reviewing material, e.g. for an exam
+- Coursework: homework, labs and projects for a class
+- LeetCode: coding interview practice problems
+- Job hunting, Apartment hunting, Shopping: searching for those
+- Other: anything else
+"task_summary": one sentence, at most 120 characters, that a stranger will read. Say what
+they are making, learning or looking for, and name the specific subject. Describe their goal,
+not the page: never copy a page title, and never name an app, website, tool, command or file,
+except LeetCode and Figma.
 Pick the dominant activity. NEVER include names, emails, phone numbers, addresses,
 prices, URLs, account details, message contents, or anything that identifies anyone.
 Ignore email, messaging, banking, and health pages; never describe them.
@@ -33,28 +46,79 @@ If there is no clear shareable work activity, set "shareable" to false."#;
 
 /// The labels SYSTEM_PROMPT suggests. Output is snapped to this spelling so a
 /// topic stays identical across pushes (connections are stored per topic).
-const KNOWN_TOPICS: [&str; 7] = [
+const KNOWN_TOPICS: [&str; 15] = [
+    "Coding",
+    "Web development",
+    "App development",
+    "Data science",
+    "Machine learning",
+    "Design",
+    "Figma design",
+    "Writing",
+    "Research",
+    "Studying",
+    "Coursework",
     "LeetCode",
     "Job hunting",
     "Apartment hunting",
-    "Coursework",
-    "Studying",
-    "Figma design",
-    "Writing",
+    "Shopping",
 ];
+/// The model's answer when nothing in KNOWN_TOPICS fits; such summaries aren't shared.
+const OTHER_TOPIC: &str = "Other";
 
 static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
     json!({
         "type": "object",
         "properties": {
             "shareable":    { "type": "boolean" },
-            "topic":        { "type": "string", "maxLength": 40 },
+            // A fixed list, so the topic can't be a tool, page title or made-up label.
+            "topic":        { "type": "string", "enum": KNOWN_TOPICS.iter().copied().chain([OTHER_TOPIC]).collect::<Vec<_>>() },
             "task_summary": { "type": "string", "maxLength": 120 }
         },
         "required": ["shareable", "topic", "task_summary"],
         "additionalProperties": false
     })
 });
+/// A course code in a window or page title: "CS 61B", "CS70", "Bio 101", "Physics 7B".
+/// Department in capitals, or a capitalized word with a 3-digit number or a letter suffix
+/// (so "Note 12" and "Summer 2027" don't count).
+static COURSE_IN_TITLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b(?:([A-Z]{2,5}) ?(\d{1,3}[A-Z]{0,2})|([A-Z][a-z]{2,9}) (\d{3}[A-Z]?|\d{1,2}[A-Z]))\b").unwrap()
+});
+
+/// Kinds of work that can be for a class; with a course on screen, the course becomes the topic.
+const COURSE_WORK_TOPICS: [&str; 7] = ["Coursework", "Studying", "Coding", "Writing", "Data science", "Machine learning", "Research"];
+
+/// LeetCode on screen + a coding or studying topic means interview practice. The model
+/// is easily led by problem names ("Course Schedule" → Coursework).
+fn leetcode_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Option<String> {
+    let on_leetcode = captures.iter().any(|capture| capture.host.ends_with("leetcode.com"))
+        || apps.iter().any(|app| app.window_title.as_deref().is_some_and(|title| title.contains("LeetCode")));
+    let coding_or_studying = ["Coding", "Web development", "App development", "Studying", "Coursework"];
+    (on_leetcode && coding_or_studying.contains(&topic)).then(|| "LeetCode".to_string())
+}
+
+/// Coursework or studying for a course named on screen gets the course as its topic,
+/// so classmates in the same course connect on one topic.
+fn course_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Option<String> {
+    if !COURSE_WORK_TOPICS.contains(&topic) {
+        return None;
+    }
+    let titles = captures
+        .iter()
+        .map(|capture| capture.title.as_str())
+        .chain(apps.iter().filter_map(|app| app.window_title.as_deref()));
+    titles.into_iter().find_map(|title| {
+        let found = COURSE_IN_TITLE.captures(title)?;
+        // Capital departments as written ("CS 61B"); word departments keep their case ("Physics 7B").
+        match (found.get(1), found.get(2), found.get(3), found.get(4)) {
+            (Some(dept), Some(number), _, _) => Some(format!("{} {}", dept.as_str(), number.as_str())),
+            (_, _, Some(dept), Some(number)) => Some(format!("{} {}", dept.as_str(), number.as_str())),
+            _ => None,
+        }
+    })
+}
+
 static COURSE_CODE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([A-Za-z]{2,5}) ?(\d{1,3}[A-Za-z]{0,2})$").unwrap());
 
@@ -327,7 +391,9 @@ where
                 return match clean(output) {
                     Some((topic, task_summary)) => ActivitySummary {
                         shareable: true,
-                        topic,
+                        topic: leetcode_topic(&topic, &captures, &apps)
+                            .or_else(|| course_topic(&topic, &captures, &apps))
+                            .unwrap_or(topic),
                         task_summary,
                         source: Source::Llama,
                         window_minutes,
@@ -436,7 +502,7 @@ fn clock_time(unix_ms: i64) -> String {
 /// are scrubbed again, and anything that still looks like contact details,
 /// links or money makes the whole summary not shareable.
 fn clean(output: ModelOutput) -> Option<(String, String)> {
-    if !output.shareable {
+    if !output.shareable || output.topic.eq_ignore_ascii_case(OTHER_TOPIC) {
         return None;
     }
     let topic = scrub(&output.topic);
@@ -730,6 +796,33 @@ mod tests {
         let chrome = prompt.find("Chrome: Two Sum - LeetCode (2 min)").expect("merged chrome line");
         assert!(code < chrome);
         assert!(!prompt.contains("Pages from"));
+    }
+
+    #[test]
+    fn course_codes_come_from_titles_on_screen() {
+        let apps = [app("Google Chrome", "Project 2: Gitlet | CS 61B Spring 2027", 0, 60_000)];
+        assert_eq!(course_topic("Coding", &[], &apps).as_deref(), Some("CS 61B"));
+        let pdf = [app("Preview", "Physics 7B Lab 3 - Overleaf", 0, 60_000)];
+        assert_eq!(course_topic("Writing", &[], &pdf).as_deref(), Some("Physics 7B"));
+        let notes = [app("Notion", "Bio 101 – Cell respiration notes", 0, 60_000)];
+        assert_eq!(course_topic("Studying", &[], &notes).as_deref(), Some("Bio 101"));
+        // Not courses, or not course work.
+        let not_course = [app("Google Chrome", "Note 12: Probability, Summer 2027", 0, 60_000)];
+        assert_eq!(course_topic("Studying", &[], &not_course), None);
+        assert_eq!(course_topic("Job hunting", &[], &apps), None);
+    }
+
+    #[test]
+    fn leetcode_on_screen_wins_over_problem_names() {
+        let captures = [capture(1, "leetcode.com", "/problems/course-schedule/", "Course Schedule - LeetCode", "")];
+        assert_eq!(leetcode_topic("Coursework", &captures, &[]).as_deref(), Some("LeetCode"));
+        assert_eq!(leetcode_topic("Job hunting", &captures, &[]), None);
+        assert_eq!(leetcode_topic("Coding", &[], &[]), None);
+    }
+
+    #[test]
+    fn other_is_never_shared() {
+        assert_eq!(clean(output(true, "Other", "Planning a trip")), None);
     }
 
     #[tokio::test]
