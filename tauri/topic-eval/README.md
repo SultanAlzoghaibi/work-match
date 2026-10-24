@@ -68,9 +68,8 @@ Topics were page-title fragments ("Google Maps", "Group by", "SQL Databases") or
    dropped, and the summary is still shared. The app sends it with each push; the backend
    ignores it until its push model has a `focus` field.
 
-**Still wrong on held-out:** Spanish practice → Writing, a resume plus job listings →
-Writing (should be Job hunting), CS 70 probability homework → Web development. These
-weren't tuned on, to keep the held-out score honest. They're good next cases to work on
-with a fresh held-out set.
+**Still wrong on held-out (latest run):** Spanish practice → Writing, and CS 70 probability
+homework → Web development. These weren't tuned on, to keep the held-out score honest.
+They're good next cases to work on with a fresh held-out set.
 
 Summaries (not scored) still sometimes name a tool ("with Next.js", "in Unity").
