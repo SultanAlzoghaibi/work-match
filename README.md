@@ -81,3 +81,21 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the design doc. Activity capture (Chrom
 extension, local buffer, local Llama summaries) needs a sidecar binary, a model file and
 the extension: see [docs/activity-capture.md](docs/activity-capture.md). Summaries are
 built with Llama.
+
+## What activity capture sends to the backend
+
+It sends only this body, and only when the local model marks the summary as shareable:
+
+```json
+{ "task_summary": "Working through graph problems on LeetCode", "topic": "LeetCode" }
+```
+
+- `task_summary`: one sentence, at most 120 characters. The person you're matched with
+  sees it.
+- `topic`: a 1–3 word label (`LeetCode`, `Job hunting`, `CS 61B`, …). It's used for
+  connections and the "friend is active" icon.
+
+Nothing else leaves the laptop: no URLs, page text, titles or timestamps. When a summary
+isn't shareable, nothing is sent. This is the body of `POST /push` in
+[docs/API.md](docs/API.md). The app doesn't send it yet: `api::on_summary` in
+`tauri/src-tauri/src/api.rs` is still a stub.
