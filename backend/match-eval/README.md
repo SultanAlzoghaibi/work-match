@@ -28,12 +28,29 @@ Pairs with the same `a` go in one request, like production scoring several candi
 | `topic+strict` | Both |
 | `general` | Topic + criteria as general rules, with no subjects, places or jobs from the pair files (the fair version of `topic+strict`) |
 | `general-no-place` | `general` without "place" in the false rule, plus "Being in a different city or at a different event doesn't matter" |
+| `general-agnostic` | `general-no-place` that also says a different company doesn't matter |
 
 The pairs cover same activity with different specifics, related work across apps
 (writing Dijkstra code vs watching a shortest-path lecture), hard negatives (same
 label, different subject or city) and plain unrelated pairs.
 
 ## Results
+
+### Different company (2026-10-24, `company_pairs.json` added)
+
+11 new pairs (10 counted): the same marketing, sales, engineering, data, recruiting or
+onboarding work at different companies (match), and the same company with a different role
+(no match). 121 pairs total, 105 counted, threshold 0.45:
+
+| Variant | Right | New pairs | Company matches score | Same company, different role |
+|---|---|---|---|---|
+| `current` (production) | 94% | 100% | 0.62–0.88 | 0.18, 0.24 |
+| `general-no-place` | 96% | 100% | | |
+| `general-agnostic` | 96% (97% at 0.50) | 100% | 0.69–0.92 | 0.06, 0.24 |
+
+Matching is already company-agnostic; saying so in the criteria widens the margin both
+ways. B2B whitepaper vs consumer TikTok marketing scores ~0.1 with every wording (left
+`unsure`: same function, very different work).
 
 ### Different city / event (2026-10-24, `place_event_pairs.json` added)
 

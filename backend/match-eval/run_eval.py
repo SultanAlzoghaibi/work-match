@@ -153,6 +153,18 @@ GENERAL_NO_PLACE_CRITERIA = {
 }
 
 
+# general-no-place, also saying the company doesn't matter (same work in the
+# same field at a different company is a match). Still general wording.
+GENERAL_AGNOSTIC_CRITERIA = {
+    "true": GENERAL_CRITERIA["true"],
+    "false": (
+        "Their activities are different, or they only share a broad category of activity "
+        "while the specific subject, field or goal is different. Being in a different city, "
+        "at a different event or at a different company doesn't matter."
+    ),
+}
+
+
 def line(prefix: str, side: dict, with_topic: bool) -> str:
     if with_topic and side.get("topic"):
         return f"{prefix} ({side['topic']}): {side['task_summary']}"
@@ -307,13 +319,13 @@ def rank(groups: list[dict], scorer, threshold: float) -> dict:
     return out
 
 
-PAIR_FILES = ["match_pairs.json", "holdout_pairs.json", "extra_pairs.json", "fresh_pairs.json", "place_event_pairs.json"]
+PAIR_FILES = ["match_pairs.json", "holdout_pairs.json", "extra_pairs.json", "fresh_pairs.json", "place_event_pairs.json", "company_pairs.json"]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="word-overlap baseline, no API calls")
-    parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict, general, general-no-place, two-goal, two-product, two-min, two-mean")
+    parser.add_argument("--variant", action="append", help="current, with-topic, strict, topic+strict, general, general-no-place, general-agnostic, two-goal, two-product, two-min, two-mean")
     parser.add_argument("--no-calls", action="store_true", help="only use cached Jev answers; never call Jev")
     parser.add_argument("--threshold", type=float, default=float(os.environ.get("MATCH_THRESHOLD", "0.8")),
                         help="threshold used for 'right at' and the ranking checks")
@@ -345,6 +357,7 @@ def main() -> None:
             "topic+strict": lambda me, others: ask_jev(key, me, others, True, STRICT_CRITERIA, sultan),
             "general": lambda me, others: ask_jev(key, me, others, True, GENERAL_CRITERIA, sultan),
             "general-no-place": lambda me, others: ask_jev(key, me, others, True, GENERAL_NO_PLACE_CRITERIA, sultan),
+            "general-agnostic": lambda me, others: ask_jev(key, me, others, True, GENERAL_AGNOSTIC_CRITERIA, sultan),
             # Same request (cached once), combined four ways.
             "two-goal": lambda me, others: [g for a, g in ask_two(key, me, others, sultan)],
             "two-product": lambda me, others: [a * g for a, g in ask_two(key, me, others, sultan)],
