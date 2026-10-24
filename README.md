@@ -1,0 +1,4 @@
+# work-match
+
+- backend/
+- tauri/
