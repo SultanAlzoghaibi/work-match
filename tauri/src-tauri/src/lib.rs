@@ -81,7 +81,7 @@ pub fn run() {
                 .icon(tray_icon)
                 .tooltip("work-match")
                 .menu(&menu)
-                // Left click opens the panel; right click shows the menu.
+                // Left click toggles the panel; right click shows the menu.
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "open" => window::open_panel(app),
@@ -95,7 +95,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        window::open_panel(tray.app_handle());
+                        window::toggle_panel(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -106,17 +106,8 @@ pub fn run() {
                 apply_window_style(&main_window);
             }
 
-            // Non-macOS: no NSPanel resign-key, so hide on blur instead.
             #[cfg(not(target_os = "macos"))]
-            {
-                let window_for_blur = main_window.clone();
-                main_window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Focused(false) = event {
-                        let _ = window_for_blur.hide();
-                    }
-                });
-                let _ = main_window.center_at_cursor_monitor();
-            }
+            let _ = main_window.center_at_cursor_monitor();
 
             Ok(())
         })

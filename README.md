@@ -55,6 +55,6 @@ yarn
 yarn tauri dev
 ```
 
-Left-click the smiling globe in the menu bar to open the panel, click away to hide it, and right-click → Quit to exit.
+Left-click the smiling globe in the menu bar to open the panel and again to close it. It stays open when you click other apps. Right-click → Quit to exit.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the design doc.

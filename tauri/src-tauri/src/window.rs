@@ -18,15 +18,24 @@ tauri_panel! {
             is_floating_panel: true,
         }
     })
-
-    panel_event!(SpotlightPanelEventHandler {
-        window_did_resign_key(notification: &NSNotification) -> (),
-    })
 }
 
-/// Open the panel from a tray click. The app runs as an Accessory (no dock
-/// icon) and the panel is nonactivating, so activate the app first or the
-/// panel never really becomes key and resign-key hides it right away.
+/// Tray left-click: open the panel, or close it if it's already showing.
+/// Clicking elsewhere does NOT hide it; it stays until toggled or quit.
+pub fn toggle_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
+    let Some(main_window) = app.get_webview_window(crate::MAIN_LABEL) else {
+        return;
+    };
+    if main_window.is_visible().unwrap_or(false) {
+        let _ = main_window.hide();
+    } else {
+        open_panel(app);
+    }
+}
+
+/// Open the panel. The app runs as an Accessory (no dock icon) and the panel
+/// is nonactivating, so activate the app first or the panel never really
+/// becomes key and typing into it goes to the previous app.
 #[cfg(target_os = "macos")]
 pub fn open_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
     let app_for_main = app.clone();
@@ -143,18 +152,6 @@ impl<R: Runtime> WebviewWindowExt<R> for WebviewWindow<R> {
         let _ = panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
         // Round the NSPanel itself so the glass matches the rounded CSS layout.
         panel.set_corner_radius(26.0);
-
-        // Click away -> hide, like a menu-bar popover.
-        let handler = SpotlightPanelEventHandler::new();
-        let app_handle = self.app_handle().clone();
-        handler.window_did_resign_key(move |_| {
-            if let Ok(panel) = app_handle.get_webview_panel(crate::MAIN_LABEL) {
-                if panel.is_visible() {
-                    panel.hide();
-                }
-            }
-        });
-        panel.set_event_handler(Some(handler.as_ref()));
 
         Ok(panel)
     }

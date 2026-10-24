@@ -71,13 +71,14 @@ Flow: detect activity → summarize on device → push every 5 min → backend r
 
 `tauri/src-tauri/src/`
 - `lib.rs` – builder, tray icon + menu (Open / Quit), Accessory activation policy (no dock icon), liquid glass styling, `os_name` command.
-- `window.rs` – converts the main window to a spotlight-style `NSPanel` (floating, all spaces, nonactivating, 26px corners), centers on the cursor's monitor, hides on click-away (resign key).
+- `window.rs` – converts the main window to a spotlight-style `NSPanel` (floating, all spaces, nonactivating, 26px corners), opens right under the tray icon.
 
 Behaviour:
 - App starts hidden, lives in the menu bar.
-- Left-click tray → panel shows "Hello World" on Liquid Glass.
-- Click away → hides. Right-click → menu → Quit.
-- Windows: same, but hides on window blur and uses a CSS translucent card.
+- Left-click tray → panel opens under the icon on Liquid Glass (mock login, then profile view/edit). Left-click again → closes.
+- Clicking other apps does **not** hide it; it stays until toggled from the tray or quit.
+- Right-click → menu → Open / Quit.
+- Windows: same, but centered on screen with a CSS translucent card.
 
 ### Local SQLite
 
