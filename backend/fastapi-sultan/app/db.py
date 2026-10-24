@@ -1,14 +1,19 @@
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
+
+# backend/fastapi-sultan/.env, wherever uvicorn is started from.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 def database_url() -> str:
     url = os.environ.get("DATABASE_URL")
     if not url:
-        raise RuntimeError("DATABASE_URL is not set (see backend/.env.example)")
+        raise RuntimeError("DATABASE_URL is not set (see backend/fastapi-sultan/.env.example)")
     return url
 
 

@@ -1,4 +1,4 @@
-// work-match FastAPI backend (backend/app/main.py).
+// work-match FastAPI backend (backend/fastapi-sultan/app/main.py).
 // Override with VITE_API_URL, e.g. VITE_API_URL=https://api.example.com yarn tauri dev
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
 
