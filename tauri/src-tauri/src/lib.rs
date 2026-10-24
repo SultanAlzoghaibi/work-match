@@ -149,7 +149,7 @@ fn apply_window_style(window: &WebviewWindow) {
         apply_liquid_glass(
             window,
             NSGlassEffectViewStyle::Clear,
-            Some((0, 0, 0, 120)),
+            Some((0, 0, 0, 200)),
             Some(26.0),
         )
         .expect("liquid glass unsupported");
