@@ -55,17 +55,17 @@ Decision: the desktop app is the product. A Chrome extension can come later as a
 │ Tray icon (smiling globe) ─click─▶ Glass panel (Vite + JS)    │
 │ Activity detector (future): frontmost app, browser URL,       │
 │   calendar → "topic" string                                   │
-│ WS client (future) ─────────────────────────────┐             │
+│ HTTP push (5 min) + poll (20 s) ────────────────┐             │
 └──────────────────────────────────────────────────┼────────────┘
                                                    ▼
 ┌────────────────────── backend/ (future) ─────────────────────┐
-│ Presence: who is online + current topic                       │
-│ Matcher: pair users on same topic/field, rate-limit intros    │
-│ Connections: accepted pairs, "connection is live" fan-out     │
+│ curr_task: who is working + summary/topic                    │
+│ Matcher (Jev): runs on each push, writes matches              │
+│ Connections + is_working_on_connections (active icons)        │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Flow: detect topic → send presence → backend finds match → desktop shows intro in the panel / notification → accept → connection saved + Discord call link opened.
+Flow: detect activity → summarize on device → push every 5 min → backend runs Jev → match row → desktop shows intro in the panel / notification → accept → connection saved + Discord call link opened.
 
 ## 6. Current milestone: tray + glass hello world ✅
 
@@ -86,7 +86,7 @@ Behaviour:
   - `curr_user_profile`: a single row for the signed-in user and token
   - `activity_log`: app and calendar stretches, plus a derived `topic`
   - `settings`
-- Raw activity stays on the device. Only the topic goes to the backend, whose schema is in `backend/schema.sql`.
+- Raw activity stays on the device. Only `task_summary` and `topic` go to the backend, whose schema is in `backend/schema.sql` (see [DATABASE.md](DATABASE.md)).
 - Demo data lives in `src-tauri/src/seed/defaults.sql` and is applied by `db::seeder::seed_defaults`. It is **not run by default**. To use it, uncomment the call in `lib.rs` setup.
 - The frontend opens the same DB via `src/db.js` (`getDb()`).
 
@@ -97,8 +97,8 @@ Left out: global shortcut, SQLite, updater, autostart, websocket, telemetry, rem
 ## 7. Next steps
 
 1. **Activity detection (macOS):** frontmost app via `NSWorkspace`, browser tab URL via AppleScript (needs Automation permission), optional calendar via EventKit → map to a topic.
-2. **Backend (`backend/`):** auth, presence over WebSocket, simple matcher (same topic, both opted in, not recently intro'd).
+2. **Backend (`backend/`):** auth, push/poll endpoints, Jev matcher run on each push (see [DATABASE.md](DATABASE.md)).
 3. **Intro UI:** match card in the panel + native notification; Accept / Not now.
 4. **Connections:** store accepted pairs; notify when a connection goes live on a shared topic.
 5. **Call:** open a Discord call/invite link on accept.
-6. **Privacy:** only send the derived topic, never raw URLs/window titles; pause toggle in the tray menu.
+6. **Privacy:** only send the on-device summary and topic, never raw URLs/window titles/HTML; pause toggle in the tray menu (deletes `curr_task`).

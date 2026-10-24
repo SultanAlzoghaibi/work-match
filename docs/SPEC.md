@@ -19,7 +19,7 @@ Track: Meta, "Bringing people closer together with AI".
 
 | Criterion | How work-match meets it |
 |---|---|
-| Human connection | Live intro → 25-min session together → friends → "your friend is working on this now" |
+| Human connection | Live intro → call together → connection → "your connection is working on this now" |
 | AI is essential | Matching is by meaning across apps (VS Code `dijkstra.py` ↔ YouTube shortest-path lecture). Without the models there is no match |
 | AI well-integrated | No chatbot; the user does nothing extra. AI shows up as one good popup |
 | Originality | Matches on what you are doing right now, not a profile or a feed |
@@ -83,12 +83,12 @@ OpenRouter) is a decision model: it answers typed questions with
 probabilities, not text.
 
 - `noul` "these two would benefit from working alongside each other right
-  now" → P(good match), stored as `offers.score`.
+  now" → P(good match), stored as `matches.score`.
 - `noul` "this person is in deep focus and an interruption would be
   unwelcome" → skip people Jev thinks shouldn't be interrupted.
 - At demo scale a `choice` over all online candidates can replace embeddings.
 - Jev has no built-in learning. To improve over time, include a few past
-  matches and their outcomes (accepted? became friends?) in `state`. The
+  matches and their outcomes (accepted? became a connection?) in `state`. The
   schema already stores these outcomes.
 - Only summaries, school and bio are sent, never raw screen data.
 
@@ -105,10 +105,10 @@ improve Meta's products.
 
 ### 3.5 After a match
 
-Offer expires in 2 min → both accept → Discord call + 25-min session with
-shared goals → each answers "add as friend?" → both yes = friends → notify
-when the other starts working on that topic. A declined pair isn't matched
-again for 1 day. (Matches `backend/schema.sql`.)
+Match popup expires in 2 min → both accept → Discord call → each answers "keep in
+touch?" → both yes = a connection on that topic → the friend's icon lights up whenever
+the other pushes a task on that topic. A declined pair isn't matched again for 1 day.
+See [DATABASE.md](DATABASE.md) and `backend/schema.sql`.
 
 ## 4. Models
 
@@ -137,7 +137,7 @@ Screenshots are the biggest risk: passwords, messages, other people's data.
 2. **Capture the minimum:** active window only, once a minute.
 3. **On-device:** OCR and summarizing run on the Mac. Screenshots never leave it.
 4. **Delete immediately:** images are never written to disk; snapshots are dropped after each summary.
-5. **Share the minimum:** the server gets the summary; other users see only the shared topic.
+5. **Share the minimum:** the server gets the summary and topic. A match sees your name, school, bio and current summary in the popup; connections see only the topic.
 6. **User control:** screen capture is opt-in (off by default), there's a pause button, and the panel shows exactly what is shared.
 
 Jev and Muse run in the cloud but only ever receive summaries. Check Jev's
@@ -151,5 +151,4 @@ data policy on its OpenRouter model page before launch.
 - Chrome extension for richer page content: build it, or rely on AppleScript URLs plus OCR?
 - Muse Glimmer vs. Llama 3.2 3B for on-device summaries.
 - Jev match threshold (start at 0.7) and how much detail goes into the summary.
-- Schema changes needed: summary and intro fields on `offers`,
-  `connections.topic`, `users.discord_handle`, a local `summaries` table.
+- Schema still missing: intro text on `matches`, `users.discord_handle`.

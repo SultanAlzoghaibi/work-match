@@ -12,9 +12,34 @@ You do nothing extra. As you work, a background app notices what you're on (apps
 
 If it clicks, add her as a connection and join a call with her (or a Discord call, to save time and not reinvent the wheel). From then on, the app tells you whenever she's working on that topic, so you can join her.
 
+## Architecture
+
+```
+Tauri app (on your Mac)                          Backend (Supabase)                Jev
+───────────────────────                          ──────────────────                ───
+reads current app, URLs, page HTML
+  → filters out private stuff (blocklist)
+  → local AI summarizes the last 5 min
+every 5 min: PUSH task_summary + topic ───────→  curr_task (overwrite) ────────→  scores me against
+                                                 is_working_on_connections         filtered candidates
+                                                 matches  ←──────── good pair ───  (age, country, ...)
+every 20 s: POLL ←─────────────────────────────  pending matches + active friends
+  → match popup / friend "active" icon
+quit or pause ────────────────────────────────→  delete my curr_task + active rows
+```
+
+- **Push (every 5 min):** the app sends only a summary and a topic label. Raw activity
+  never leaves the device. Each push also **triggers the Jev search for that user**.
+- **Poll (every 20 s):** the app asks for new match popups and which friends are active.
+- **Quit or pause:** the app deletes its `curr_task`, so nobody gets matched with or
+  pinged about someone who isn't working.
+- **Match** = a one-time pairing that leads to a call. **Connection** = a permanent
+  follow on a topic. See [docs/DATABASE.md](docs/DATABASE.md) and the full walkthrough in
+  [docs/USE_CASE.md](docs/USE_CASE.md).
+
 ## Repo layout
 
-- `backend/` – matching server
+- `backend/` – matching server and database schema (`schema.sql`)
 - `tauri/` – macOS menu-bar (tray) desktop app
 
 ## Platforms
