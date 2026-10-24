@@ -56,6 +56,29 @@ async function quitApp() {
   invoke("quit_app");
 }
 
+// --- Light / dark mode ------------------------------------------------------
+
+/// "auto" follows the Mac's appearance; "light" / "dark" pin it. The toggle in
+/// the title bar cycles auto -> light -> dark.
+const THEMES = { auto: "◐", light: "☀", dark: "☾" };
+const themeToggle = document.getElementById("theme-toggle");
+
+function applyTheme(mode) {
+  if (mode === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
+  themeToggle.textContent = THEMES[mode];
+  themeToggle.title = `Appearance: ${mode === "auto" ? "match the Mac" : mode} (click to change)`;
+}
+
+let themeMode = THEMES[remember.get("theme")] ? remember.get("theme") : "auto";
+applyTheme(themeMode);
+themeToggle.addEventListener("click", () => {
+  const order = Object.keys(THEMES);
+  themeMode = order[(order.indexOf(themeMode) + 1) % order.length];
+  remember.set("theme", themeMode);
+  applyTheme(themeMode);
+});
+
 /// Result of the last Save, shown once on the profile view.
 let syncStatus = null;
 
@@ -109,7 +132,8 @@ function matchLine(match) {
   if (match.match_id != null) return `Matched with ${match.other_name} (${match.scores[0].score.toFixed(2)}). Check the popup.`;
   if (match.skipped_reason) return `No match: ${match.skipped_reason}.`;
   const best = match.scores[0];
-  return best ? `No match: best was ${best.name} at ${best.score.toFixed(2)} (needs 0.80).` : "No match.";
+  // The cutoff lives on the backend (MATCH_THRESHOLD, 0.45 by default).
+  return best ? `No match: best was ${best.name} at ${best.score.toFixed(2)}, below the match cutoff.` : "No match.";
 }
 
 /// A pretend activity: clicking a task button behaves like the real 5-minute

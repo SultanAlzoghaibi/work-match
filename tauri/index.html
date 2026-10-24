@@ -14,7 +14,10 @@
     <header class="titlebar" data-tauri-drag-region>
       <span id="titlebar-user" class="titlebar-user" data-tauri-drag-region></span>
       <span class="titlebar-title" data-tauri-drag-region>work-match</span>
-      <span id="titlebar-status" class="titlebar-status" data-tauri-drag-region></span>
+      <div class="titlebar-right" data-tauri-drag-region>
+        <button id="theme-toggle" class="theme-toggle" type="button"></button>
+        <span id="titlebar-status" class="titlebar-status" data-tauri-drag-region></span>
+      </div>
     </header>
     <main id="root"></main>
     <script type="module" src="/src/main.js"></script>

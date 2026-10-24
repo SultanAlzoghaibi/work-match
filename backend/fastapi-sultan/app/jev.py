@@ -5,6 +5,7 @@ its own yes/no ("noul") question over a shared state.
 """
 
 import os
+import time
 
 import httpx
 
@@ -21,12 +22,17 @@ def _line(label: str, topic: str | None, summary: str) -> str:
     return f"{label} ({topic}): {summary}" if topic else f"{label}: {summary}"
 
 
-def score_candidates(my_summary: str, candidates: list[dict], my_topic: str | None = None) -> dict:
+def score_candidates(
+    my_summary: str, candidates: list[dict], my_topic: str | None = None, trace: dict | None = None
+) -> dict:
     """Return {candidate user_id: P(good match)} for up to MAX_CANDIDATES.
 
     Candidates are labelled "Person 1", "Person 2", ... (no names), so Jev
     judges the work, not who is doing it. Each line carries the summarizer's
     topic label when there is one.
+
+    trace, if given, is filled with what was sent and received for the
+    jev_runs log: request, response, duration_ms.
     """
     key = os.environ.get("JEV_API")
     if not key:
@@ -66,17 +72,21 @@ def score_candidates(my_summary: str, candidates: list[dict], my_topic: str | No
             },
         }
 
+    body = {"model": JEV_MODEL, "state": state, "questions": questions}
+    if trace is not None:
+        trace["request"] = body
+    started = time.monotonic()
     try:
-        response = httpx.post(
-            JEV_URL,
-            headers={"Authorization": f"Bearer {key}"},
-            json={"model": JEV_MODEL, "state": state, "questions": questions},
-            timeout=30,
-        )
+        response = httpx.post(JEV_URL, headers={"Authorization": f"Bearer {key}"}, json=body, timeout=30)
         response.raise_for_status()
         answers = response.json()["answers"]
     except (httpx.HTTPError, KeyError, ValueError) as err:
         raise JevError(f"Jev request failed: {err}") from err
+    finally:
+        if trace is not None:
+            trace["duration_ms"] = round((time.monotonic() - started) * 1000)
+    if trace is not None:
+        trace["response"] = answers
 
     return {
         candidate["user_id"]: float(answers[f"c{index}"]["noul"])
