@@ -21,4 +21,3 @@ thiserror = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
-monitor = { git = "https://github.com/ahkohd/tauri-toolkit", branch = "v2" }

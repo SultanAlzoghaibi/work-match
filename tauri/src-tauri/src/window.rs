@@ -38,19 +38,76 @@ pub fn open_panel<R: Runtime>(app: &tauri::AppHandle<R>) {
             .get_webview_panel(crate::MAIN_LABEL)
             .or_else(|_| main_window.to_spotlight_panel())
         {
-            let _ = main_window.center_at_cursor_monitor();
-            if let Some(main_thread) = tauri_nspanel::objc2::MainThreadMarker::new() {
-                let ns_app =
-                    tauri_nspanel::objc2_app_kit::NSApplication::sharedApplication(main_thread);
-                #[allow(deprecated)]
-                ns_app.activateIgnoringOtherApps(true);
-            }
+            let Some(main_thread) = tauri_nspanel::objc2::MainThreadMarker::new() else {
+                return;
+            };
+            let ns_app =
+                tauri_nspanel::objc2_app_kit::NSApplication::sharedApplication(main_thread);
+            #[allow(deprecated)]
+            ns_app.activateIgnoringOtherApps(true);
+
+            // Pop out of the tray: start as a small pill right under the
+            // icon, then let AppKit animate the frame up to full size.
+            let (small, full) = tray_anchored_frames(main_thread);
+            let ns_panel = panel.as_panel();
+            ns_panel.setFrame_display(small, true);
             panel.show_and_make_key();
+            ns_panel.setFrame_display_animate(full, true, true);
             return;
         }
         let _ = main_window.show();
         let _ = main_window.set_focus();
     });
+}
+
+/// Full panel size in points; keep in sync with tauri.conf.json width/height.
+#[cfg(target_os = "macos")]
+const PANEL_SIZE: NSSize = NSSize::new(420.0, 220.0);
+/// Size the panel starts at before it grows out of the tray icon.
+#[cfg(target_os = "macos")]
+const START_SIZE: NSSize = NSSize::new(60.0, 30.0);
+/// Gap between the menu bar / screen edge and the panel.
+#[cfg(target_os = "macos")]
+const EDGE_GAP: f64 = 8.0;
+
+/// (start, end) frames for the open animation, both hanging from the menu
+/// bar under the cursor (which is on the tray icon when it was clicked).
+/// Cocoa coordinates: origin bottom-left, y grows upward.
+#[cfg(target_os = "macos")]
+fn tray_anchored_frames(main_thread: tauri_nspanel::objc2::MainThreadMarker) -> (NSRect, NSRect) {
+    use tauri_nspanel::objc2_app_kit::{NSEvent, NSScreen};
+
+    let mouse = NSEvent::mouseLocation();
+    let screens = NSScreen::screens(main_thread);
+    let screen = screens
+        .iter()
+        .find(|screen| {
+            let frame = screen.frame();
+            mouse.x >= frame.origin.x
+                && mouse.x <= frame.origin.x + frame.size.width
+                && mouse.y >= frame.origin.y
+                && mouse.y <= frame.origin.y + frame.size.height
+        })
+        .or_else(|| NSScreen::mainScreen(main_thread));
+    let visible = screen.map(|screen| screen.visibleFrame()).unwrap_or(NSRect::new(
+        NSPoint::new(0.0, 0.0),
+        NSSize::new(1440.0, 900.0),
+    ));
+
+    let top = visible.origin.y + visible.size.height - EDGE_GAP;
+    let min_x = visible.origin.x + EDGE_GAP;
+    let max_x = visible.origin.x + visible.size.width - EDGE_GAP;
+    let centered_under_mouse = |width: f64| (mouse.x - width / 2.0).clamp(min_x, max_x - width);
+
+    let small = NSRect::new(
+        NSPoint::new(centered_under_mouse(START_SIZE.width), top - START_SIZE.height),
+        START_SIZE,
+    );
+    let full = NSRect::new(
+        NSPoint::new(centered_under_mouse(PANEL_SIZE.width), top - PANEL_SIZE.height),
+        PANEL_SIZE,
+    );
+    (small, full)
 }
 
 /// Windows (and anything non-macOS): plain show + focus on the cursor's monitor.
@@ -70,16 +127,15 @@ enum Error {
     #[cfg(target_os = "macos")]
     #[error("Unable to convert window to panel")]
     Panel,
-    #[cfg(target_os = "macos")]
-    #[error("Unable to find panel: {0}")]
-    PanelNotFound(String),
-    #[error("Monitor with cursor not found")]
+    #[cfg(not(target_os = "macos"))]
+    #[error("Monitor not found")]
     MonitorNotFound,
 }
 
 pub trait WebviewWindowExt<R: Runtime> {
     #[cfg(target_os = "macos")]
     fn to_spotlight_panel(&self) -> tauri::Result<PanelHandle<R>>;
+    #[cfg(not(target_os = "macos"))]
     fn center_at_cursor_monitor(&self) -> tauri::Result<()>;
 }
 
@@ -114,33 +170,6 @@ impl<R: Runtime> WebviewWindowExt<R> for WebviewWindow<R> {
         panel.set_event_handler(Some(handler.as_ref()));
 
         Ok(panel)
-    }
-
-    #[cfg(target_os = "macos")]
-    fn center_at_cursor_monitor(&self) -> tauri::Result<()> {
-        let monitor = monitor::get_monitor_with_cursor()
-            .ok_or(TauriError::Anyhow(Error::MonitorNotFound.into()))?;
-        let monitor_scale_factor = monitor.scale_factor();
-        let monitor_size = monitor.size().to_logical::<f64>(monitor_scale_factor);
-        let monitor_position = monitor.position().to_logical::<f64>(monitor_scale_factor);
-
-        let panel = self
-            .get_webview_panel(self.label())
-            .map_err(|_| TauriError::Anyhow(Error::PanelNotFound(self.label().into()).into()))?;
-        let panel = panel.as_panel();
-        let panel_frame = panel.frame();
-
-        let rect = NSRect {
-            origin: NSPoint {
-                x: (monitor_position.x + (monitor_size.width / 2.0))
-                    - (panel_frame.size.width / 2.0),
-                y: (monitor_position.y + (monitor_size.height / 2.0))
-                    - (panel_frame.size.height / 2.0),
-            },
-            size: panel_frame.size,
-        };
-        panel.setFrame_display(rect, true);
-        Ok(())
     }
 
     #[cfg(not(target_os = "macos"))]
