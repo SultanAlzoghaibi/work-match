@@ -75,7 +75,7 @@ function callButton(view) {
   return el(
     "button",
     { class: "call", onclick: () => invoke("open_call", { matchId: view.match_id }).catch(console.error) },
-    "📞 Join call",
+    "Join call",
   );
 }
 
@@ -104,7 +104,7 @@ function renderAccepted(view) {
 
   if (view.connected && view.my_keep && view.their_keep) {
     show(
-      el("div", { class: "eyebrow" }, "🤝 Work friends"),
+      el("div", { class: "eyebrow" }, "Work friends"),
       el("p", { class: "intro" }, "You and ", el("strong", {}, name), " are connected on ", topic, "."),
       el("p", { class: "meta" }, "You'll see them in Work friends whenever they're on it."),
       personCard(other),
@@ -112,7 +112,7 @@ function renderAccepted(view) {
     );
   } else if (view.connected) {
     show(
-      el("div", { class: "eyebrow" }, "🎉 Let's go"),
+      el("div", { class: "eyebrow" }, "Let's go"),
       el("p", { class: "intro" }, "You and ", el("strong", {}, name), " are working on ", topic, " together."),
       personCard(other),
       closeButton(view),
@@ -129,7 +129,7 @@ function renderAccepted(view) {
     );
   } else if (view.my_keep) {
     show(
-      el("div", { class: "eyebrow" }, "🎉 It's a match"),
+      el("div", { class: "eyebrow" }, "It's a match"),
       el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to say if they want to keep in touch…"),
       personCard(other),
       view.room_id ? el("div", { class: "actions" }, callButton(view)) : null,
@@ -145,7 +145,7 @@ function renderAccepted(view) {
       }
     };
     show(
-      el("div", { class: "eyebrow" }, "🎉 It's a match"),
+      el("div", { class: "eyebrow" }, "It's a match"),
       el("p", { class: "intro" }, "You both accepted! Keep in touch with ", el("strong", {}, name), " on ", topic, "?"),
       el("p", { class: "meta" }, "If you both say yes, you'll see when they're working on it."),
       view.room_id
@@ -206,7 +206,7 @@ function render(view) {
       }
     };
     show(
-      el("div", { class: "eyebrow" }, "🌍 Match found"),
+      el("div", { class: "eyebrow" }, "Match found"),
       el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to answer…"),
       el("p", { class: "task" }, other.task_summary ?? ""),
       error,

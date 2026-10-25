@@ -57,17 +57,6 @@ function check(ok, label, detail) {
 
 function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
   const now = status.now;
-  const toggle = el(
-    "button",
-    {
-      class: "secondary",
-      onclick: async () => {
-        await invoke("set_sharing", { enabled: !status.sharing_on });
-        onRefresh();
-      },
-    },
-    status.sharing_on ? "Turn off" : "Turn on",
-  );
   const capture = {
     listening: [true, "listening on 127.0.0.1:47321"],
     failed: [false, "port 47321 is taken: another instance is capturing; restart this one first"],
@@ -76,12 +65,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
   }[status.capture_server];
   return section(
     "Status",
-    el(
-      "div",
-      { class: "dev-check-row" },
-      check(status.sharing_on, "Share my activity", status.sharing_on ? "on: tracking apps + Chrome" : "off: nothing is tracked"),
-      toggle,
-    ),
+    check(status.sharing_on, "Share my activity", "always on: tracking apps + Chrome (friend finding decides what's pushed)"),
     check(capture[0], "Chrome capture server", capture[1]),
     check(
       status.last_capture_at ? true : false,
@@ -102,14 +86,14 @@ function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
     el(
       "div",
       { class: "dev-actions" },
-      el("button", { class: "primary", onclick: onPushNow }, "⚡ Push now"),
+      el("button", { class: "primary", onclick: onPushNow }, "Push now"),
       // Mock data (match_popup.rs), never sent to the backend.
       el(
         "button",
         { class: "secondary", title: "Shows the match popup with a made-up person", onclick: () => invoke("trigger_mock_match") },
         "Trigger match found",
       ),
-      el("button", { class: "secondary", title: "Remove your current task from the backend and everything built up on this Mac for the next summary", onclick: onClear }, "🧹 Clear"),
+      el("button", { class: "secondary", title: "Remove your current task from the backend and everything built up on this Mac for the next summary", onclick: onClear }, "Clear"),
       el("button", { class: "link", onclick: onRefresh }, "Refresh"),
     ),
   );
@@ -183,7 +167,7 @@ function capturesSection(captures) {
 
 function lastRunSection(lastRun) {
   const { run, push } = lastRun;
-  if (!run) return section("Last summary run", el("p", { class: "muted fine-print" }, "No summary yet this session. Press ⚡ Push now."));
+  if (!run) return section("Last summary run", el("p", { class: "muted fine-print" }, "No summary yet this session. Press Push now."));
   const summary = run.summary ?? {};
   const result = summary.shareable
     ? `${summary.topic}: ${summary.task_summary}`
@@ -278,31 +262,34 @@ export function renderDevTab({ onPushNow, onClear, top }) {
       invoke("dev_last_run").catch(() => ({ run: null, push: null })),
     ]);
     const open = new Set([...body.querySelectorAll("details[open] > summary")].map((node) => node.textContent));
+    // filter: a missing clearStatus would otherwise render as the text "null".
     body.replaceChildren(
-      statusSection(
-        status,
-        backendOk,
-        refresh,
-        async () => {
-          await onPushNow();
-          refresh();
-        },
-        async () => {
-          try {
-            clearStatus = { ok: true, text: `Cleared: ${await onClear()}.` };
-          } catch (err) {
-            clearStatus = { ok: false, text: `Clear failed: ${err}` };
-          }
-          history = undefined;
-          refreshServer();
-          refresh();
-        },
-      ),
-      clearStatus ? el("p", { class: `sync ${clearStatus.ok ? "ok" : "fail"}` }, clearStatus.text) : null,
-      appsSection(sessions, status.now),
-      capturesSection(captures),
-      lastRunSection(lastRun),
-      historySection(history),
+      ...[
+        statusSection(
+          status,
+          backendOk,
+          refresh,
+          async () => {
+            await onPushNow();
+            refresh();
+          },
+          async () => {
+            try {
+              clearStatus = { ok: true, text: `Cleared: ${await onClear()}.` };
+            } catch (err) {
+              clearStatus = { ok: false, text: `Clear failed: ${err}` };
+            }
+            history = undefined;
+            refreshServer();
+            refresh();
+          },
+        ),
+        clearStatus ? el("p", { class: `sync ${clearStatus.ok ? "ok" : "fail"}` }, clearStatus.text) : null,
+        appsSection(sessions, status.now),
+        capturesSection(captures),
+        lastRunSection(lastRun),
+        historySection(history),
+      ].filter(Boolean),
     );
     // Keep expanded sections open across refreshes.
     for (const summary of body.querySelectorAll("details > summary")) {

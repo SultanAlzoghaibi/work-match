@@ -3,7 +3,6 @@
 use crate::buffer::Buffer;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tauri::menu::CheckMenuItem;
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Clone)]
@@ -40,9 +39,6 @@ impl Sharing {
     }
 }
 
-/// The tray's "Share my activity" item, kept so `set_sharing` can move its checkmark.
-pub struct SharingMenuItem(pub CheckMenuItem<tauri::Wry>);
-
 /// The one way sharing changes, from the tray or from the UI.
 pub fn set(app: &AppHandle, on: bool) {
     app.state::<Sharing>().store(on);
@@ -54,9 +50,6 @@ pub fn set(app: &AppHandle, on: bool) {
         // TODO: tell the backend to delete curr_task (QUIT / PAUSE in backend/schema.sql).
     }
     crate::db::save_sharing_enabled(app, on);
-    if let Some(item) = app.try_state::<SharingMenuItem>() {
-        let _ = item.0.set_checked(on);
-    }
     println!("[sharing] {}", if on { "on" } else { "off" });
 }
 
@@ -65,9 +58,14 @@ pub fn get_sharing(sharing: State<'_, Sharing>) -> bool {
     sharing.is_on()
 }
 
+/// Sharing is always on now (friend finding is the switch), so a request to
+/// turn it off is ignored.
 #[tauri::command]
 pub fn set_sharing(app: AppHandle, enabled: bool) {
-    set(&app, enabled);
+    if !enabled {
+        println!("[sharing] stays on: turn friend finding off instead");
+    }
+    set(&app, true);
 }
 
 #[cfg(test)]

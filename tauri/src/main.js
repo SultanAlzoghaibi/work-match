@@ -7,6 +7,7 @@ import { API_URL, clearTask, login, setUserId, signup, userId, deleteConnection,
 import { MOCK_TASKS, randomSummary } from "./mockTasks.js";
 import { renderDevTab } from "./devTab.js";
 import { SCHOOLS } from "./schools.js";
+import { startEffects } from "./effects.js";
 import { AGE_GROUPS, LANGUAGES, parseLanguages, DEFAULT_NAME, loadProfile, logout, resizeImage, saveSession, saveAvatarUrl, saveProfile } from "./profile.js";
 
 // Same idea as TyA's getOs(): ask Rust for the target OS instead of sniffing
@@ -93,7 +94,10 @@ const titlebarStatus = document.getElementById("titlebar-status");
 
 /// Title bar pill mirrors friend finding so it's visible from any view.
 function paintTitlebarStatus() {
-  titlebarStatus.textContent = friendFinding ? "● Finding friends" : "Friend finding off";
+  // The dot blinks while searching (effects.css).
+  titlebarStatus.replaceChildren(
+    ...(friendFinding ? [el("span", { class: "status-dot" }), "Finding friends"] : ["Friend finding off"]),
+  );
   titlebarStatus.classList.toggle("on", friendFinding);
 }
 paintTitlebarStatus();
@@ -110,6 +114,61 @@ function friendFindingButton() {
   paintFriendButton(button);
   friendButtons.add(button);
   return button;
+}
+
+/// The tray's Earth, clickable: asleep while friend finding is off, searching
+/// while it's on. Same frames as the tray (friend_finding::planet_frames).
+let planetFrames = null;
+async function loadPlanetFrames() {
+  const buffer = new Uint8Array(await invoke("planet_frames"));
+  const view = new DataView(buffer.buffer, buffer.byteOffset);
+  const [awake, asleep] = [buffer[0], buffer[1]];
+  const size = view.getUint16(2, true);
+  const frameMs = view.getUint16(4, true);
+  const frameBytes = size * size * 4;
+  const images = [];
+  for (let i = 0; i < awake + asleep; i += 1) {
+    const start = 6 + i * frameBytes;
+    images.push(new ImageData(new Uint8ClampedArray(buffer.slice(start, start + frameBytes)), size, size));
+  }
+  return { size, frameMs, awake: images.slice(0, awake), asleep: images.slice(awake) };
+}
+
+function planetToggle() {
+  const canvas = el("canvas", { class: "planet-canvas" });
+  const caption = el("p", { class: "planet-caption" });
+  const box = el(
+    "button",
+    {
+      type: "button",
+      class: "planet-toggle",
+      onclick: () => invoke("set_friend_finding", { enabled: !friendFinding }).catch(console.error),
+    },
+    canvas,
+    caption,
+  );
+  let frame = 0;
+  const draw = () => {
+    if (!box.isConnected && frame > 0) return false;
+    caption.textContent = friendFinding ? "Looking for someone… tap to stop" : "Asleep. Tap the Earth to start looking";
+    box.classList.toggle("on", friendFinding);
+    if (planetFrames) {
+      const frames = friendFinding ? planetFrames.awake : planetFrames.asleep;
+      canvas.width = canvas.height = planetFrames.size;
+      canvas.getContext("2d").putImageData(frames[frame % frames.length], 0, 0);
+    }
+    frame += 1;
+    return true;
+  };
+  (planetFrames ? Promise.resolve(planetFrames) : loadPlanetFrames())
+    .then((frames) => {
+      planetFrames = frames;
+      draw();
+      const timer = setInterval(() => draw() || clearInterval(timer), frames.frameMs);
+    })
+    .catch((err) => console.warn("planet frames", err));
+  draw();
+  return box;
 }
 
 listen("friend-finding", (event) => {
@@ -164,7 +223,7 @@ function updateSummaryCard() {
   if (!latestSummary) {
     card.replaceChildren(
       el("h3", { class: "section-title" }, "Your summary"),
-      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Turn on sharing and press ⚡ Push now in the Dev tab, or pick a demo task there."),
+      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Turn on friend finding, or press Push now in the Dev tab."),
     );
     return;
   }
@@ -403,25 +462,34 @@ function renderTaskDemo() {
   taskUi.countdown = el("p", { class: "task-status muted" });
   taskUi.status = el("p", { class: "task-status muted" });
   taskUi.matchStatus = el("p", { class: "task-status muted" });
+  // Closed until you open it; stays the way you left it across re-renders.
   const section = el(
-    "div",
+    "details",
     { class: "task-demo" },
-    el("h3", { class: "section-title" }, "Find someone now"),
-    el("span", { class: "label" }, "Pretend to work on a task: a new example every 5 min until Stop (demo)"),
+    el("summary", {}, el("h3", { class: "section-title" }, "Find someone now")),
     el(
       "div",
-      { class: "task-buttons" },
-      ...buttons,
-      taskUi.stopButton,
+      { class: "task-demo-body" },
+      el("span", { class: "label" }, "Pretend to work on a task: a new example every 5 min until Stop (demo)"),
+      el(
+        "div",
+        { class: "task-buttons" },
+        ...buttons,
+        taskUi.stopButton,
+      ),
+      taskUi.pushNote,
+      taskUi.countdown,
+      taskUi.status,
+      taskUi.matchStatus,
     ),
-    taskUi.pushNote,
-    taskUi.countdown,
-    taskUi.status,
-    taskUi.matchStatus,
   );
+  section.open = taskDemoOpen;
+  section.addEventListener("toggle", () => (taskDemoOpen = section.open));
   updateTaskUi();
   return section;
 }
+
+let taskDemoOpen = false;
 
 // --- Work friends (connections) --------------------------------------------
 
@@ -481,7 +549,7 @@ function friendRow(connection) {
       "div",
       { class: "friend-info" },
       el("div", { class: "friend-name" }, friend.name),
-      el("div", { class: "friend-topic" }, active ? `🟢 On ${topic} now` : `${topic} · offline`),
+      el("div", { class: "friend-topic" }, active ? `On ${topic} now` : `${topic} · offline`),
       active && friend.task_summary ? el("p", { class: "friend-task" }, friend.task_summary) : null,
     ),
     active
@@ -662,8 +730,8 @@ function renderLogin(lastUsername) {
     el(
       "section",
       { class: "login" },
-      el("div", { class: "sticker blue" }, "🌍"),
-      el("div", { class: "sticker sun" }, "⚡"),
+      el("div", { class: "sticker blue" }, "●"),
+      el("div", { class: "sticker sun" }, "+"),
       el("div", { class: "sticker mint" }, "✓"),
       el("div", { class: "sticker ember" }, "★"),
       el("h1", { class: "display" }, "Work", el("br"), "Match"),
@@ -933,6 +1001,7 @@ function renderFriendsTab() {
   return el(
     "div",
     { class: "tab-body" },
+    planetToggle(),
     friendFindingButton(),
     (summaryUi.card = el("div", { class: "summary-card" })),
     renderFriends(),
@@ -948,7 +1017,6 @@ function renderProfileTab(profile) {
         "header",
         {},
         avatar(profile),
-        el("div", { class: "sticker violet" }, "🌍"),
         el(
           "div",
           { class: "who" },
@@ -974,9 +1042,6 @@ function renderProfileTab(profile) {
         detailRow("Country", profile.country, inlineEditor(profile, "country", textInput(profile, "country", { maxlength: "2", placeholder: "CA" }))),
         detailRow("Discord", profile.discord_handle, inlineEditor(profile, "discord_handle", textInput(profile, "discord_handle", { maxlength: "40" }))),
         detailRow("Languages", parseLanguages(profile.languages).join(", "), inlineEditor(profile, "languages", textInput(profile, "languages", { maxlength: "200", placeholder: "English, Arabic" }))),
-        detailRow("Sharing", profile.sharing_enabled ? "On" : "Off", () =>
-          setSharing(!profile.sharing_enabled).then(render, renderError),
-        ),
         schoolOptions(),
       ),
       el(
@@ -1028,9 +1093,6 @@ function renderEdit(profile) {
     el("button", { type: "button", class: "secondary", onclick: () => photoInput.click() }, "Change photo"),
   );
 
-  const sharing = el("input", { type: "checkbox", name: "sharing_enabled" });
-  sharing.checked = Boolean(profile.sharing_enabled);
-
   const form = el(
     "form",
     {
@@ -1038,9 +1100,8 @@ function renderEdit(profile) {
       onsubmit: async (event) => {
         event.preventDefault();
         const data = Object.fromEntries(new FormData(form));
-        data.sharing_enabled = sharing.checked;
+        data.sharing_enabled = true;
         data.country = (data.country ?? "").toUpperCase();
-        await invoke("set_sharing", { enabled: sharing.checked }).catch(console.warn);
         await saveAndSync(data);
       },
     },
@@ -1056,7 +1117,6 @@ function renderEdit(profile) {
     textField("Discord", "discord_handle", profile.discord_handle, { maxlength: "40" }),
     textField("Languages", "languages", profile.languages, { maxlength: "200", placeholder: "English, Arabic", list: "language-options" }),
     el("datalist", { id: "language-options" }, ...LANGUAGES.map((name) => el("option", { value: name }))),
-    el("label", { class: "toggle" }, sharing, el("span", {}, "Share what I'm working on")),
     el(
       "footer",
       {},
@@ -1095,7 +1155,6 @@ function renderPerson({ other, topic, score }) {
           "header",
           {},
           avatar(other),
-          el("div", { class: "sticker mint" }, "🤝"),
           el(
             "div",
             { class: "who" },
@@ -1161,4 +1220,5 @@ async function render() {
   }
 }
 
+startEffects();
 render();

@@ -119,10 +119,6 @@ pub fn run() {
                 .id("header")
                 .enabled(false)
                 .build(app)?;
-            let sharing_item = tauri::menu::CheckMenuItemBuilder::new("Share my activity")
-                .id("sharing")
-                .checked(app.state::<sharing::Sharing>().is_on())
-                .build(app)?;
             let friends_item = tauri::menu::CheckMenuItemBuilder::new("Turn on friend finding")
                 .id("friend_finding")
                 .checked(false)
@@ -136,13 +132,11 @@ pub fn run() {
             let menu = tauri::menu::MenuBuilder::new(app)
                 .item(&header_item)
                 .separator()
-                .item(&sharing_item)
                 .item(&friends_item)
                 .separator()
                 .item(&open_item)
                 .item(&quit_item)
                 .build()?;
-            app.manage(sharing::SharingMenuItem(sharing_item));
             app.manage(friend_finding::FriendFindingMenuItem(friends_item));
 
             TrayIconBuilder::with_id(friend_finding::TRAY_ID)
@@ -153,10 +147,6 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     // Driven by our flag, not the item's own toggle, so the checkmark can't drift.
-                    "sharing" => {
-                        let on = !app.state::<sharing::Sharing>().is_on();
-                        sharing::set(app, on);
-                    }
                     "friend_finding" => {
                         let on = !app.state::<friend_finding::FriendFinding>().is_on();
                         friend_finding::set(app, on);
@@ -176,6 +166,7 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+            friend_finding::start_animator(app.handle());
 
             // Main window is a normal solid dark window; only the match
             // popup is a floating panel with liquid glass.
@@ -214,6 +205,7 @@ pub fn run() {
             match_popup::open_call,
             friend_finding::get_friend_finding,
             friend_finding::set_friend_finding,
+            friend_finding::planet_frames,
             sharing::get_sharing,
             sharing::set_sharing,
             summarizer::get_last_summary,
@@ -244,7 +236,10 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     let buffer = buffer::Buffer::open(&data_dir.join(buffer::FILE_NAME))?;
     // Captured text never survives a restart.
     buffer.clear_captures()?;
-    let sharing = sharing::Sharing::new(db::load_sharing_enabled(app.handle()).unwrap_or(false));
+    // Activity sharing is always on; friend finding decides whether anything
+    // is pushed (api::on_summary). The stored flag is kept in sync for old code.
+    let sharing = sharing::Sharing::new(true);
+    db::save_sharing_enabled(app.handle(), true);
 
     buffer::start_sweeper(buffer.clone());
     // Only one app can own the extension's port. The second dev instance

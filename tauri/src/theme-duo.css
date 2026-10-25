@@ -455,3 +455,44 @@ input[type="checkbox"]:checked {
 .login .skip {
   width: 300px;
 }
+
+/* --- Work friends: the clickable Earth (same frames as the tray) ---------- */
+
+button.planet-toggle {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px 8px;
+  border: none;
+  background: transparent;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-pencil-gray);
+}
+
+button.planet-toggle:hover:not(:disabled) {
+  filter: none;
+  transform: translateY(-2px);
+}
+
+button.planet-toggle:active:not(:disabled) {
+  border-bottom-width: 0;
+  transform: scale(0.96);
+}
+
+.planet-canvas {
+  width: 96px;
+  height: 96px;
+  image-rendering: auto;
+}
+
+.planet-caption {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+button.planet-toggle.on .planet-caption {
+  color: var(--color-navy);
+}

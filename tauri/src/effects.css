@@ -1,0 +1,262 @@
+/* Ambient motion for the main window: drifting background glow, a soft light
+   that follows the mouse, and hover lift on controls and cards.
+   Loaded after the theme; src/effects.js feeds the mouse position. */
+
+/* --- Background glow ------------------------------------------------------ */
+
+.glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glow span {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.45;
+  will-change: transform;
+}
+
+/* Slightly darker canvas than the cards, so they read as lifted. */
+html,
+body {
+  background: #e8eef8;
+}
+
+:root[data-theme="dark"] body {
+  background: #0d171c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body {
+    background: #0d171c;
+  }
+}
+
+.glow span:nth-child(1) {
+  background: #0081fb;
+  top: -25vmax;
+  left: -20vmax;
+  animation: drift-a 22s ease-in-out infinite alternate;
+}
+
+.glow span:nth-child(2) {
+  background: #0050b8;
+  bottom: -30vmax;
+  right: -25vmax;
+  opacity: 0.35;
+  animation: drift-b 28s ease-in-out infinite alternate;
+}
+
+.glow span:nth-child(3) {
+  background: #3d9bff;
+  top: 30%;
+  left: 35%;
+  width: 40vmax;
+  height: 40vmax;
+  opacity: 0.25;
+  animation: drift-c 34s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  to { transform: translate(25vw, 30vh) scale(1.15); }
+}
+
+@keyframes drift-b {
+  to { transform: translate(-30vw, -25vh) scale(0.9); }
+}
+
+@keyframes drift-c {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(-25vw, 15vh) scale(1.2); }
+  100% { transform: translate(15vw, -20vh) scale(0.85); }
+}
+
+/* "Energy": faint light streaks sweeping slowly across the glow. */
+.glow::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0 140px,
+    rgba(255, 255, 255, 0.08) 160px,
+    transparent 200px 340px
+  );
+  animation: energy 18s linear infinite;
+}
+
+@keyframes energy {
+  to { transform: translateX(340px); }
+}
+
+/* --- "Finding friends" pill ------------------------------------------------- */
+/* A small dot that blinks while friend finding is on, like a "live" light. */
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 1px;
+  animation: live-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 129, 251, 0.45); }
+  50%      { opacity: 0.35; transform: scale(0.8); box-shadow: 0 0 0 4px rgba(0, 129, 251, 0); }
+}
+
+/* --- Cursor follower ------------------------------------------------------- */
+/* A small dot on the pointer and a ring that trails it on a spring
+   (src/effects.js). The real cursor stays; this only decorates it. */
+
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  pointer-events: none;
+  border-radius: 50%;
+  transition: opacity 0.25s ease, width 0.2s ease, height 0.2s ease, margin 0.2s ease, background-color 0.2s ease;
+}
+
+.cursor-dot {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  background: #0081fb;
+}
+
+.cursor-ring {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 1.5px solid rgba(0, 129, 251, 0.45);
+  background: rgba(0, 129, 251, 0.04);
+}
+
+/* Over something clickable or a card: the ring opens up a little. */
+body.cursor-hover .cursor-ring {
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  background: rgba(0, 129, 251, 0.08);
+}
+
+body.cursor-down .cursor-ring {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+}
+
+body.mouse-out .cursor-dot,
+body.mouse-out .cursor-ring {
+  opacity: 0;
+}
+
+/* Page content sits above the glow. */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Hover effects -------------------------------------------------------- */
+
+button,
+.details,
+.card,
+.friend,
+.row.editable .value,
+.editable {
+  transition: transform 0.18s ease, background-color 0.18s ease, filter 0.18s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Cards light up under the cursor (src/effects.js sets --x / --y on them). */
+.details,
+.card,
+.friend {
+  position: relative;
+}
+
+.details::before,
+.card::before,
+.friend::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(
+    220px circle at var(--x, 50%) var(--y, 50%),
+    rgba(77, 162, 255, 0.18),
+    transparent 70%
+  );
+}
+
+.details:hover::before,
+.card:hover::before,
+.friend:hover::before {
+  opacity: 1;
+}
+
+.friend:hover,
+.card:hover {
+  transform: translateY(-2px);
+}
+
+/* Green "online" dot, drawn instead of an emoji. */
+.friend.online .friend-topic::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-mint-pop);
+  vertical-align: 1px;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot {
+    animation: none;
+  }
+  .cursor-dot,
+  .cursor-ring {
+    display: none;
+  }
+  .glow::after,
+  .glow span,
+  .friend.online .friend-topic::before {
+    animation: none;
+  }
+  button:hover:not(:disabled),
+  .friend:hover,
+  .card:hover {
+    transform: none;
+  }
+}

@@ -13,7 +13,12 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State, Wry};
 
 pub const TRAY_ID: &str = "main";
 const FRAME_MS: u64 = 90;
+/// Searching: one look left-and-right cycle (~2.5 s).
 const FRAMES: usize = 28;
+/// Sleeping: one snore, in and out (~3.6 s).
+const SLEEP_FRAMES: usize = 40;
+/// Searching frames where the eyes are shut: one quick blink per cycle.
+const BLINK_FRAMES: [usize; 2] = [6, 7];
 
 #[derive(Default)]
 pub struct FriendFinding(Arc<AtomicBool>);
@@ -28,7 +33,7 @@ pub struct FriendFindingMenuItem(pub CheckMenuItem<Wry>);
 
 /// Tray icon for the current state: a sleeping gray Earth when off.
 pub fn base_icon() -> Image<'static> {
-    planet(false, 0.0)
+    planet(false, 0.0, 0.0, false)
 }
 
 pub fn is_on<R: Runtime>(app: &AppHandle<R>) -> bool {
@@ -45,7 +50,6 @@ pub fn set<R: Runtime>(app: &AppHandle<R>, on: bool) {
     app.emit("friend-finding", on).ok();
     if on && !was_on {
         start_search(app);
-        spawn_animation(app.clone(), flag);
     } else if !on && was_on {
         stop_search(app);
     }
@@ -68,25 +72,61 @@ fn stop_search<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
-/// Smiling Earth sweeps a magnifying glass and looks left and right until the flag goes off, then puts it back to sleep.
-fn spawn_animation<R: Runtime>(app: AppHandle<R>, flag: Arc<AtomicBool>) {
+/// Animates the tray Earth for as long as the app runs: asleep (snoring, with
+/// "z"s drifting up) while friend finding is off, awake and searching with a
+/// magnifying glass (and the odd blink) while it's on. Call once, after the
+/// tray icon exists.
+pub fn start_animator<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    let flag = app.state::<FriendFinding>().0.clone();
     std::thread::spawn(move || {
-        let frames: Vec<_> = (0..FRAMES)
-            // Overdriven sine, clamped: it lingers a moment at each side.
-            .map(|f| planet(true, ((f as f32 / FRAMES as f32 * std::f32::consts::TAU).sin() * 1.4).clamp(-1.0, 1.0)))
-            .collect();
         let mut i = 0;
-        while flag.load(Ordering::SeqCst) {
+        loop {
+            let frames = if flag.load(Ordering::SeqCst) { &FRAMES_SET.awake } else { &FRAMES_SET.asleep };
             if let Some(tray) = app.tray_by_id(TRAY_ID) {
-                tray.set_icon(Some(frames[i % FRAMES].clone())).ok();
+                tray.set_icon(Some(frames[i % frames.len()].clone())).ok();
             }
             i += 1;
             std::thread::sleep(Duration::from_millis(FRAME_MS));
         }
-        if let Some(tray) = app.tray_by_id(TRAY_ID) {
-            tray.set_icon(Some(base_icon())).ok();
-        }
     });
+}
+
+struct Frames {
+    awake: Vec<Image<'static>>,
+    asleep: Vec<Image<'static>>,
+}
+
+/// Drawn once, shared by the tray and the Earth in the Work friends tab.
+static FRAMES_SET: std::sync::LazyLock<Frames> = std::sync::LazyLock::new(|| {
+    let tau = std::f32::consts::TAU;
+    Frames {
+        awake: (0..FRAMES)
+            // Overdriven sine, clamped: it lingers a moment at each side.
+            .map(|f| {
+                let look = ((f as f32 / FRAMES as f32 * tau).sin() * 1.4).clamp(-1.0, 1.0);
+                planet(true, look, 0.0, BLINK_FRAMES.contains(&f))
+            })
+            .collect(),
+        asleep: (0..SLEEP_FRAMES)
+            .map(|f| planet(false, 0.0, f as f32 / SLEEP_FRAMES as f32, false))
+            .collect(),
+    }
+});
+
+/// The tray's frames for the app window, as raw bytes: [awake count, asleep
+/// count, size (u16 LE), frame ms (u16 LE)], then each frame's RGBA, awake
+/// frames first. The Work friends tab plays them on a canvas.
+#[tauri::command]
+pub fn planet_frames() -> tauri::ipc::Response {
+    let frames = &*FRAMES_SET;
+    let mut bytes = vec![frames.awake.len() as u8, frames.asleep.len() as u8];
+    bytes.extend((SIZE as u16).to_le_bytes());
+    bytes.extend((FRAME_MS as u16).to_le_bytes());
+    for image in frames.awake.iter().chain(&frames.asleep) {
+        bytes.extend_from_slice(image.rgba());
+    }
+    tauri::ipc::Response::new(bytes)
 }
 
 // --- Planet drawing ---------------------------------------------------------
@@ -149,9 +189,11 @@ fn cover(d: f32) -> f32 {
     (0.5 - d * SCALE).clamp(0.0, 1.0)
 }
 
-/// awake: smiling blue-and-green Earth with a magnifying glass; asleep: grayed
-/// out, eyes shut, "zzz". look (-1 left .. 1 right) moves the pupils and the glass.
-fn planet(awake: bool, look: f32) -> Image<'static> {
+/// awake: smiling blue-and-green Earth with a magnifying glass; look (-1 left
+/// .. 1 right) moves the pupils and the glass, blink shuts the eyes.
+/// asleep: grayed out, eyes shut, snoring; phase (0..1) is where it is in one
+/// snore: the mouth opens and closes and the "z"s drift up and fade.
+fn planet(awake: bool, look: f32, phase: f32, blink: bool) -> Image<'static> {
     let (sea, land) = if awake { (hex(0x3a8ee6), hex(0x55c46a)) } else { (hex(0x7d8ca3), hex(0xa7b0a2)) };
     let ink = hex(0x000000);
     let white = hex(0xffffff);
@@ -176,8 +218,15 @@ fn planet(awake: bool, look: f32) -> Image<'static> {
             if awake {
                 for e in eyes {
                     let e = (e.0 + look * 1.3, e.1);
-                    layers.push((ink, cover(dist(p, e) - 2.2)));
-                    layers.push((white, cover(dist(p, (e.0 + 0.8, e.1 - 0.8)) - 0.7)));
+                    if blink {
+                        // Shut: a short happy curve, like the sleeping eyes.
+                        if p.1 > e.1 {
+                            layers.push((ink, cover((dist(p, e) - 2.2).abs() - 0.7)));
+                        }
+                    } else {
+                        layers.push((ink, cover(dist(p, e) - 2.2)));
+                        layers.push((white, cover(dist(p, (e.0 + 0.8, e.1 - 0.8)) - 0.7)));
+                    }
                 }
                 for e in eyes {
                     layers.push((hex(0xff8fb1), cover(dist(p, (e.0 + (e.0 - c.0).signum() * 1.5, e.1 + 4.0)) - 1.6) * 0.8));
@@ -194,8 +243,17 @@ fn planet(awake: bool, look: f32) -> Image<'static> {
                         layers.push((ink, cover((dist(p, e) - 2.5).abs() - 0.7)));
                     }
                 }
-                // Small flat mouth.
-                layers.push((ink, cover(seg(p, (c.0 - 2.0, c.1 + 6.0), (c.0 + 2.0, c.1 + 6.0)) - 0.7)));
+                // Snoring: the mouth breathes from a flat line to a small "o".
+                let open = (1.0 - (phase * std::f32::consts::TAU).cos()) / 2.0;
+                let m = (c.0, c.1 + 6.0);
+                if open < 0.15 {
+                    layers.push((ink, cover(seg(p, (m.0 - 2.0, m.1), (m.0 + 2.0, m.1)) - 0.7)));
+                } else {
+                    // An ellipse: squash y so it reads as a mouth, not an eye.
+                    let (rx, ry) = (1.2 + 0.8 * open, 0.6 + 1.6 * open);
+                    let d = (((p.0 - m.0) / rx).powi(2) + ((p.1 - m.1) / ry).powi(2)).sqrt();
+                    layers.push((ink, cover((d - 1.0) * rx.min(ry))));
+                }
             }
             // Outline last so it sits on top of everything inside.
             layers.push((ink, cover((dist(p, c) - r).abs() - 0.8)));
@@ -212,14 +270,19 @@ fn planet(awake: bool, look: f32) -> Image<'static> {
                 layers.push((hex(0x8a5a2b), cover(handle - 1.4)));
                 layers.push((ink, cover(ring - 0.9)));
             } else {
-            // Two "z"s rising to the top-right, the second bigger.
-            for (zx, zy, zs) in [(29.0, 8.5, 4.2), (36.0, 1.8, 5.6)] {
+            // Three "z"s, a third of a snore apart, each drifting up and to the
+            // right, growing, fading in and then out.
+            for k in 0..3 {
+                let t = (phase + k as f32 / 3.0).fract();
+                let fade = (t * std::f32::consts::PI).sin();
+                let zs = 2.6 + 3.0 * t;
+                let (zx, zy) = (27.0 + 8.0 * t, 12.0 - 11.0 * t);
                 let z = seg(p, (zx, zy), (zx + zs, zy))
                     .min(seg(p, (zx + zs, zy), (zx, zy + zs)))
                     .min(seg(p, (zx, zy + zs), (zx + zs, zy + zs)));
                 // White rim keeps them readable on a dark menu bar.
-                layers.push((white, cover(z - 1.5)));
-                layers.push((ink, cover(z - 0.6)));
+                layers.push((white, cover(z - 1.5) * fade));
+                layers.push((ink, cover(z - 0.6) * fade));
             }
             }
 

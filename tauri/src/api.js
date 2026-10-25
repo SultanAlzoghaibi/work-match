@@ -43,7 +43,7 @@ export function updateUser(userId, profile) {
       .split(",")
       .map((language) => language.trim())
       .filter(Boolean),
-    sharing_enabled: Boolean(profile.sharing_enabled),
+    sharing_enabled: true, // always on; friend finding is the switch
   });
 }
 

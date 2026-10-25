@@ -47,7 +47,7 @@ export async function saveSession({ user, token }, username) {
     [
       token, user.id, username.toLowerCase(), user.name, user.school, user.career, user.bio,
       user.age_group, user.country, user.discord_handle, user.avatar_url,
-      (user.languages ?? []).join(", ") || null, user.sharing_enabled ? 1 : 0,
+      (user.languages ?? []).join(", ") || null, 1,
     ],
   );
 }
@@ -69,7 +69,7 @@ export async function saveProfile(profile) {
      SET name = $1, school = $2, career = $3, bio = $4, age_group = $5, country = $6,
          discord_handle = $7, languages = $8, sharing_enabled = $9
      WHERE id = 1`,
-    [...values, profile.sharing_enabled ? 1 : 0],
+    [...values, 1], // sharing is always on
   );
 }
 
