@@ -70,6 +70,16 @@ pub fn router(state: CaptureState) -> Router {
 /// 0 = starting, 1 = listening, 2 = couldn't bind (another instance has the port).
 static LISTENING: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
+/// When the extension last reached us (unix ms, 0 = never), whether or not
+/// the page was kept. The buffer is wiped after every summary, so it can't
+/// answer "is the extension working?" on its own.
+static LAST_HEARD_AT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// For the Dev tab.
+pub fn last_heard_at() -> Option<i64> {
+    Some(LAST_HEARD_AT.load(std::sync::atomic::Ordering::Relaxed)).filter(|at| *at > 0)
+}
+
 /// For the Dev tab.
 pub fn listening_status() -> &'static str {
     match LISTENING.load(std::sync::atomic::Ordering::Relaxed) {
@@ -94,12 +104,20 @@ pub fn start(buffer: Buffer, sharing: Sharing) {
         allowed_origin: allowed_origin().into(),
     };
     tauri::async_runtime::spawn(async move {
-        let listener = match tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, PORT)).await {
-            Ok(listener) => listener,
-            Err(err) => {
-                LISTENING.store(2, std::sync::atomic::Ordering::Relaxed);
-                eprintln!("[capture] can't listen on 127.0.0.1:{PORT}: {err}");
-                return;
+        // After a rebuild the old app can still hold the port for a moment, so
+        // keep retrying instead of leaving the extension with nobody listening.
+        let mut logged = false;
+        let listener = loop {
+            match tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, PORT)).await {
+                Ok(listener) => break listener,
+                Err(err) => {
+                    LISTENING.store(2, std::sync::atomic::Ordering::Relaxed);
+                    if !logged {
+                        eprintln!("[capture] can't listen on 127.0.0.1:{PORT} yet ({err}); retrying every 2 s");
+                        logged = true;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                }
             }
         };
         LISTENING.store(1, std::sync::atomic::Ordering::Relaxed);
@@ -122,6 +140,7 @@ async fn capture(State(state): State<CaptureState>, headers: HeaderMap, body: Bo
     if !has_allowed_origin(&headers, &state.allowed_origin) {
         return StatusCode::FORBIDDEN;
     }
+    LAST_HEARD_AT.store(buffer::now_ms(), std::sync::atomic::Ordering::Relaxed);
     if !state.sharing.is_on() {
         return StatusCode::NO_CONTENT;
     }

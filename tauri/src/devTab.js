@@ -87,8 +87,8 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
       status.last_capture_at ? true : false,
       "Chrome extension",
       status.last_capture_at
-        ? `last page ${ago(status.last_capture_at, now)} · ${status.captures_in_buffer} in buffer`
-        : "no pages yet: load extension/ in chrome://extensions and browse in Chrome",
+        ? `last heard ${ago(status.last_capture_at, now)} · ${status.captures_in_buffer} in buffer (wiped after each summary)`
+        : "nothing since the app started: load extension/ in chrome://extensions and browse in Chrome",
     ),
     // Always true on Windows, which needs no permission for window titles.
     check(status.accessibility, "Window titles", status.accessibility ? "readable" : "not granted: System Settings → Privacy & Security → Accessibility"),

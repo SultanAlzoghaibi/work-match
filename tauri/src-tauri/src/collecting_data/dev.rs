@@ -73,7 +73,13 @@ pub fn dev_status(app: AppHandle) -> DevStatus {
             .is_some_and(|sharing| sharing.is_on()),
         capture_server: crate::capture_server::listening_status(),
         captures_in_buffer: captures.len(),
-        last_capture_at: captures.iter().map(|capture| capture.captured_at).max(),
+        // Last time the extension reached the app, even if the buffer has
+        // since been wiped by a summary.
+        last_capture_at: captures
+            .iter()
+            .map(|capture| capture.captured_at)
+            .chain(crate::capture_server::last_heard_at())
+            .max(),
         accessibility: super::app_tracker::accessibility_granted(),
         llm: app
             .try_state::<crate::llm::Llm>()
