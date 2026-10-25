@@ -81,7 +81,7 @@ class AuthResponse(BaseModel):
 class TaskPush(BaseModel):
     """What the app is working on now, summarized on the device."""
 
-    task_summary: str = Field(min_length=1, max_length=1000)
+    task_summary: str = Field(min_length=1, max_length=4000)  # app asks for under 500 words
     topic: str | None = Field(default=None, max_length=60)   # short label, e.g. "LeetCode"
     filters: PushFilters = PushFilters()
 

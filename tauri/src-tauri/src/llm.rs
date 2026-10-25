@@ -21,7 +21,8 @@ const MODEL_FILES: [&str; 2] = [
     "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
 ];
 const PID_FILE: &str = "llama-server.pid";
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+// A long task_summary takes a while on a laptop CPU/GPU.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 const HEALTH_POLL: Duration = Duration::from_millis(500);
 const STARTUP_LOG_LINES: usize = 20;
 
@@ -165,7 +166,9 @@ impl Llm {
                 { "role": "user", "content": user },
             ],
             "temperature": 0,
-            "max_tokens": 200,
+            // Room for a task_summary of up to ~500 words plus the short fields;
+            // still fits the 4096-token context (-c) with the prompt.
+            "max_tokens": 1000,
             "stream": false,
             "response_format": { "type": "json_object", "schema": schema },
         });

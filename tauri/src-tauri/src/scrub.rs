@@ -18,11 +18,16 @@ static LONG_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d(?:[ -]?\d
 /// Emails, phone numbers and runs of 8+ digits become placeholders; whitespace
 /// is collapsed and the result is cut to MAX_CHARS characters.
 pub fn scrub(text: &str) -> String {
+    scrub_uncut(text).chars().take(MAX_CHARS).collect()
+}
+
+/// scrub() without the MAX_CHARS cut, for the model's task summary, which
+/// the summarizer cuts at a word boundary itself.
+pub fn scrub_uncut(text: &str) -> String {
     let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
     let text = EMAIL.replace_all(&collapsed, "[email]");
     let text = PHONE.replace_all(&text, "${1}[phone]");
-    let text = LONG_NUMBER.replace_all(&text, "[number]");
-    text.chars().take(MAX_CHARS).collect()
+    LONG_NUMBER.replace_all(&text, "[number]").into_owned()
 }
 
 #[cfg(test)]

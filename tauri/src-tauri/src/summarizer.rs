@@ -1,5 +1,5 @@
 // Turns the buffered page text into the label the backend stores in curr_task:
-// a short `topic` and a one-sentence `task_summary` that a matched stranger
+// a short `topic` and a `task_summary` describing the task, which a matched stranger
 // will read. Runs the local Llama model; nothing here leaves the device.
 use crate::buffer::{self, Buffer, Capture};
 use crate::collecting_data::app_tracker::{self, AppSession};
@@ -42,10 +42,11 @@ does. Decide by what the person is doing, not by the tools, commands or apps on 
 "focus": 2 to 4 words naming the specific subject inside that topic: the project,
 problem, concept, course material or place they are working on. Never a tool, app,
 website, command or file name, and never just the topic again.
-"task_summary": one sentence, at most 120 characters, that a stranger will read. Say what
-they are making, learning or looking for, and name the specific subject. Describe their goal,
-not the page: never copy a page title, and never name an app, website, tool, command or file,
-except LeetCode and Figma.
+"task_summary": a description, under 500 words, that a stranger will read before working
+alongside them. There is no set length: write as much as it takes to explain the task. Describe the task itself, not the pages visited: what they are making,
+solving, learning or looking for, the specific subject, where they are in it (just starting,
+stuck on a step, reviewing, almost done) and what they are trying to get done. Never copy a
+page title, and never name an app, website, tool, command or file, except LeetCode and Figma.
 Pick the dominant activity. NEVER include names, emails, phone numbers, addresses,
 prices, URLs, account details, message contents, or anything that identifies anyone.
 Ignore email, messaging, banking, and health pages; never describe them.
@@ -87,7 +88,7 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
             // The list keeps common activities on one topic.
             "topic":        { "type": "string", "enum": KNOWN_TOPICS.iter().copied().chain([OTHER_TOPIC]).collect::<Vec<_>>() },
             "focus":        { "type": "string", "maxLength": 40 },
-            "task_summary": { "type": "string", "maxLength": 120 }
+            "task_summary": { "type": "string" }
         },
         "required": ["shareable", "activity", "topic", "focus", "task_summary"],
         "additionalProperties": false
@@ -176,7 +177,9 @@ const MAX_PROMPT_CHARS: usize = 6000;
 const MAX_CAPTURE_CHARS: usize = 800;
 const MAX_TOPIC_WORDS: usize = 3;
 const MAX_TOPIC_CHARS: usize = 40;
-const MAX_SUMMARY_CHARS: usize = 120;
+// The prompt asks for under 500 words and sets no length; this only stops a
+// runaway reply. Keep it at or below the backend's TaskPush.task_summary limit.
+const MAX_SUMMARY_CHARS: usize = 4000;
 const MODEL_ATTEMPTS: usize = 2;
 /// How long the first summaries wait for llama-server to finish loading.
 const READY_WAIT: Duration = Duration::from_secs(90);
@@ -626,7 +629,7 @@ fn clean(output: ModelOutput) -> Option<(String, String, String, String)> {
         output
     };
     let topic = scrub(&output.topic);
-    let task_summary = scrub(&output.task_summary);
+    let task_summary = crate::scrub::scrub_uncut(&output.task_summary);
     if looks_identifying(&topic) || looks_identifying(&task_summary) {
         return None;
     }
@@ -760,7 +763,7 @@ mod tests {
 
     #[test]
     fn clean_truncates_long_fields() {
-        let long_summary = "Working through graph problems ".repeat(10);
+        let long_summary = "Working through graph problems ".repeat(200);
         let (topic, _activity, _focus, task_summary) =
             clean(output(true, "graph algorithms practice for interviews", &long_summary)).unwrap();
         assert_eq!(topic, "graph algorithms practice");
