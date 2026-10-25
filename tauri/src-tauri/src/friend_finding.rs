@@ -60,13 +60,9 @@ fn start_search<R: Runtime>(_app: &AppHandle<R>) {
 /// stale (11 minutes): DELETE /users/{id}/task.
 fn stop_search<R: Runtime>(app: &AppHandle<R>) {
     println!("[friend-finding] off: not pushing, removing your task from the backend");
-    let Some((api_url, user_id)) = crate::match_popup::backend_target(app) else {
-        return;
-    };
+    let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let url = format!("{api_url}/users/{user_id}/task");
-        let result = async { reqwest::Client::new().delete(&url).send().await?.error_for_status() }.await;
-        if let Err(err) = result {
+        if let Err(err) = crate::api::clear_backend_task(&app).await {
             eprintln!("[friend-finding] removing the task failed: {err}");
         }
     });

@@ -55,7 +55,7 @@ function check(ok, label, detail) {
 
 // --- Sections ------------------------------------------------------------------
 
-function statusSection(status, backendOk, onRefresh, onPushNow) {
+function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
   const now = status.now;
   const toggle = el(
     "button",
@@ -109,6 +109,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
         { class: "secondary", title: "Shows the match popup with a made-up person", onclick: () => invoke("trigger_mock_match") },
         "Trigger match found",
       ),
+      el("button", { class: "secondary", title: "Remove your current task from the backend and everything built up on this Mac for the next summary", onclick: onClear }, "🧹 Clear"),
       el("button", { class: "link", onclick: onRefresh }, "Refresh"),
     ),
   );
@@ -241,7 +242,8 @@ function historySection(history) {
 
 /// Builds the Dev tab and keeps it fresh while it's in the document. `top`
 /// (the demo task buttons) sits above the sections and isn't re-rendered.
-export function renderDevTab({ onPushNow, top }) {
+export function renderDevTab({ onPushNow, onClear, top }) {
+  let clearStatus = null;
   const body = el("div", { class: "dev-sections" }, el("p", { class: "muted" }, "Loading…"));
   let timer = null;
   // Server data (~1 s per call) is fetched in the background and shown on the
@@ -277,10 +279,26 @@ export function renderDevTab({ onPushNow, top }) {
     ]);
     const open = new Set([...body.querySelectorAll("details[open] > summary")].map((node) => node.textContent));
     body.replaceChildren(
-      statusSection(status, backendOk, refresh, async () => {
-        await onPushNow();
-        refresh();
-      }),
+      statusSection(
+        status,
+        backendOk,
+        refresh,
+        async () => {
+          await onPushNow();
+          refresh();
+        },
+        async () => {
+          try {
+            clearStatus = { ok: true, text: `Cleared: ${await onClear()}.` };
+          } catch (err) {
+            clearStatus = { ok: false, text: `Clear failed: ${err}` };
+          }
+          history = undefined;
+          refreshServer();
+          refresh();
+        },
+      ),
+      clearStatus ? el("p", { class: `sync ${clearStatus.ok ? "ok" : "fail"}` }, clearStatus.text) : null,
       appsSection(sessions, status.now),
       capturesSection(captures),
       lastRunSection(lastRun),

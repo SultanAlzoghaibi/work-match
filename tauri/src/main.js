@@ -260,6 +260,18 @@ async function startSession(kind, filters) {
 }
 
 /// Stop searching. Stop / Quit also remove the task from the backend.
+/// Dev tab "Clear": stop a demo search (friend finding stays as it is), then
+/// Rust removes the backend task and the local build-up. Returns what was cleared.
+async function clearEverything() {
+  if (session) {
+    clearInterval(sessionTimer);
+    session = null;
+    lastPush = { ended: "Cleared from the Dev tab." };
+    updateTaskUi();
+  }
+  return invoke("dev_clear");
+}
+
 async function endSession(message) {
   clearInterval(sessionTimer);
   session = null;
@@ -909,7 +921,7 @@ function renderProfile(profile) {
         : activeTab === "filters"
           ? renderFiltersTab(profile)
           : activeTab === "dev"
-            ? renderDevTab({ onPushNow: pushNow, top: renderTaskDemo() })
+            ? renderDevTab({ onPushNow: pushNow, onClear: clearEverything, top: renderTaskDemo() })
             : renderProfileTab(profile),
     ),
   );

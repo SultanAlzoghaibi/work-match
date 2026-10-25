@@ -29,6 +29,11 @@ pub struct LastRun {
 }
 
 impl DevState {
+    fn forget_runs(&self) {
+        *self.0.last_run.lock().unwrap() = None;
+        *self.0.last_push.lock().unwrap() = None;
+    }
+
     pub fn record_run(&self, run: LastRun) {
         *self.0.last_run.lock().unwrap() = Some(run);
     }
@@ -54,6 +59,40 @@ pub struct DevStatus {
     /// "ready" | "starting" | "down" (no model / binary, or it crashed)
     pub llm: &'static str,
     pub next_summary_at: Option<i64>,
+}
+
+/// Dev tab "Clear": start from nothing. Removes this user's curr_task on the
+/// backend and everything built up on this Mac for the next summary: captured
+/// pages, the last summary, the Dev tab's last run / push, and app sessions
+/// (the one in front now restarts from now). Returns what was cleared.
+#[tauri::command]
+pub async fn dev_clear(app: AppHandle) -> Result<String, String> {
+    let mut cleared = Vec::new();
+    if let Some(buffer) = app.try_state::<crate::buffer::Buffer>() {
+        buffer.clear_all().map_err(|err| format!("buffer: {err}"))?;
+        cleared.push("captured pages + last summary");
+    }
+    if let Some(dev) = app.try_state::<DevState>() {
+        dev.forget_runs();
+    }
+    if let Some(path) = crate::db::get_db_path(&app) {
+        let conn = rusqlite::Connection::open(path).map_err(|err| format!("app sessions: {err}"))?;
+        // The tracker keeps extending the newest row, so keep it and restart it at
+        // 0 s instead of deleting it out from under the tracker.
+        conn.execute_batch(
+            "DELETE FROM app_sessions WHERE id <> (SELECT MAX(id) FROM app_sessions);
+             UPDATE app_sessions SET started_at = ended_at WHERE id = (SELECT MAX(id) FROM app_sessions);",
+        )
+        .map_err(|err| format!("app sessions: {err}"))?;
+        cleared.push("app sessions");
+    }
+    match crate::api::clear_backend_task(&app).await {
+        Ok(true) => cleared.push("your task on the backend"),
+        Ok(false) => {}
+        Err(err) => return Err(format!("cleared {}, but the backend task: {err}", cleared.join(", "))),
+    }
+    println!("[dev] cleared: {}", cleared.join(", "));
+    Ok(cleared.join(", "))
 }
 
 #[tauri::command]

@@ -222,6 +222,7 @@ pub fn run() {
             collecting_data::dev::dev_status,
             collecting_data::dev::dev_captures,
             collecting_data::dev::dev_last_run,
+            collecting_data::dev::dev_clear,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

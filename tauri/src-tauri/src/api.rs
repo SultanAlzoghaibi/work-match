@@ -2,7 +2,7 @@
 // ever leaves the laptop, and only when the summary is shareable.
 use crate::summarizer::ActivitySummary;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Exactly the body of the backend push (see PUSH in backend/schema.sql).
 #[derive(Debug, PartialEq, Serialize)]
@@ -86,6 +86,22 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
             Err(err) => eprintln!("[api] push failed: {err}"),
         }
     });
+}
+
+/// DELETE /users/{id}/task: stop being matchable now. Ok(false) when no
+/// user is signed in yet, so there was nothing to remove.
+pub async fn clear_backend_task<R: Runtime>(app: &AppHandle<R>) -> Result<bool, String> {
+    let Some((api_url, user_id)) = crate::match_popup::backend_target(app) else {
+        return Ok(false);
+    };
+    let url = format!("{api_url}/users/{user_id}/task");
+    reqwest::Client::new()
+        .delete(&url)
+        .send()
+        .await
+        .and_then(|response| response.error_for_status())
+        .map(|_| true)
+        .map_err(|err| err.to_string())
 }
 
 #[cfg(test)]
