@@ -236,11 +236,12 @@ struct ModelOutput {
 
 pub fn start(app: AppHandle) {
     let demo = std::env::var("DEMO_MODE").is_ok_and(|value| value == "1");
-    // The first summary runs soon after launch, so a new user is matchable within a minute.
+    // Every minute, over the last 5 minutes (a rolling window): updates feel
+    // quick, and one stray tab doesn't flip the topic. The first runs soon after launch.
     let (first_run, every, window_minutes) = if demo {
         (Duration::from_secs(30), Duration::from_secs(30), 1)
     } else {
-        (Duration::from_secs(60), Duration::from_secs(5 * 60), 5)
+        (Duration::from_secs(15), Duration::from_secs(60), 5)
     };
     if demo {
         println!("[summarizer] demo mode: summarizing every 30 s");
@@ -315,8 +316,11 @@ async fn run_once(
         return None;
     }
     let epoch = sharing.epoch();
-    let captures = match buffer.read_all() {
-        Ok(captures) => captures,
+    // Pages stay in the buffer until the sweeper drops them (6 min), so each
+    // run reads only the ones from its window.
+    let since = buffer::now_ms() - i64::from(window_minutes) * 60_000;
+    let captures: Vec<Capture> = match buffer.read_all() {
+        Ok(captures) => captures.into_iter().filter(|capture| capture.captured_at >= since).collect(),
         Err(err) => {
             eprintln!("[summarizer] reading the buffer failed: {err}");
             return None;
@@ -351,12 +355,6 @@ async fn run_once(
         summary: serde_json::to_value(&summary).unwrap_or_default(),
     });
 
-    if let Some(max_id) = captures.iter().map(|capture| capture.id).max() {
-        // On failure the rows are read again next time, and swept within 6 minutes regardless.
-        if let Err(err) = buffer.delete_through(max_id) {
-            eprintln!("[summarizer] deleting summarized rows failed: {err}");
-        }
-    }
     if !sharing.is_on() || sharing.epoch() != epoch {
         return None;
     }
@@ -698,7 +696,6 @@ mod tests {
 
     fn capture(id: i64, host: &str, path: &str, title: &str, text: &str) -> Capture {
         Capture {
-            id,
             captured_at: NOW - 60_000 + id * 1_000,
             host: host.into(),
             path: path.into(),

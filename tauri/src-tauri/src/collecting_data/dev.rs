@@ -137,7 +137,7 @@ pub struct DevCapture {
     pub preview: String,
 }
 
-/// Chrome pages in the buffer (wiped after each summary), newest first.
+/// Chrome pages in the buffer (each kept 6 minutes), newest first.
 #[tauri::command]
 pub fn dev_captures(app: AppHandle) -> Vec<DevCapture> {
     let mut captures = app

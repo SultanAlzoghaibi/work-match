@@ -71,7 +71,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
       status.last_capture_at ? true : false,
       "Chrome extension",
       status.last_capture_at
-        ? `last heard ${ago(status.last_capture_at, now)} · ${status.captures_in_buffer} in buffer (wiped after each summary)`
+        ? `last heard ${ago(status.last_capture_at, now)} · ${status.captures_in_buffer} in buffer (kept 6 min)`
         : "nothing since the app started: load extension/ in chrome://extensions and browse in Chrome",
     ),
     // Always true on Windows, which needs no permission for window titles.
@@ -79,7 +79,7 @@ function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
     check(status.llm === "ready" ? true : status.llm === "starting" ? null : false, "Llama", status.llm === "down" ? "down: no model / llama-server, summaries fall back (not shared)" : status.llm),
     check(
       status.next_summary_at ? null : false,
-      "Next 5-min summary",
+      "Next summary (every minute, last 5 min)",
       status.next_summary_at ? `in ${duration(status.next_summary_at - now)} (${shortClock(status.next_summary_at)})` : "not scheduled",
     ),
     check(backendOk, "Backend", `${API_URL} · user ${userId()}`),
@@ -140,7 +140,7 @@ function appsSection(sessions, now) {
 
 function capturesSection(captures) {
   if (!captures.length) {
-    return section("Chrome pages in the buffer", el("p", { class: "muted fine-print" }, "Empty. Pages are cleared after each summary, so this fills up again as you browse."));
+    return section("Chrome pages in the buffer", el("p", { class: "muted fine-print" }, "Empty. Pages are kept for 6 minutes, so this fills up again as you browse."));
   }
   return section(
     "Chrome pages in the buffer",

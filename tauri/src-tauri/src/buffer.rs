@@ -46,7 +46,6 @@ pub struct NewCapture<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Capture {
-    pub id: i64,
     pub captured_at: i64,
     pub host: String,
     pub path: String,
@@ -81,18 +80,23 @@ impl Buffer {
         self.conn.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Returns false, storing nothing, when the newest row for the same page has the same text.
+    /// Returns false, storing nothing new, when the newest row for the same page
+    /// has the same text; that row's time is moved up instead, so a page you
+    /// stay on keeps counting in the summarizer's 5-minute window.
     pub fn insert(&self, capture: &NewCapture) -> rusqlite::Result<bool> {
         let conn = self.conn();
-        let last_hash: Option<String> = conn
+        let last: Option<(i64, String)> = conn
             .query_row(
-                "SELECT text_hash FROM captures WHERE host = ?1 AND path = ?2 ORDER BY id DESC LIMIT 1",
+                "SELECT id, text_hash FROM captures WHERE host = ?1 AND path = ?2 ORDER BY id DESC LIMIT 1",
                 params![capture.host, capture.path],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
-        if last_hash.as_deref() == Some(capture.text_hash) {
-            return Ok(false);
+        if let Some((id, hash)) = last {
+            if hash == capture.text_hash {
+                conn.execute("UPDATE captures SET captured_at = ?1 WHERE id = ?2", params![capture.captured_at, id])?;
+                return Ok(false);
+            }
         }
         conn.execute(
             "INSERT INTO captures (captured_at, source, host, path, title, text, text_hash)
@@ -113,25 +117,18 @@ impl Buffer {
     pub fn read_all(&self) -> rusqlite::Result<Vec<Capture>> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, captured_at, host, path, title, text FROM captures ORDER BY captured_at, id",
+            "SELECT captured_at, host, path, title, text FROM captures ORDER BY captured_at, id",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(Capture {
-                id: row.get(0)?,
-                captured_at: row.get(1)?,
-                host: row.get(2)?,
-                path: row.get(3)?,
-                title: row.get(4)?,
-                text: row.get(5)?,
+                captured_at: row.get(0)?,
+                host: row.get(1)?,
+                path: row.get(2)?,
+                title: row.get(3)?,
+                text: row.get(4)?,
             })
         })?;
         rows.collect()
-    }
-
-    /// Deletes the rows a summary read; rows inserted since then have larger ids and stay.
-    pub fn delete_through(&self, max_id: i64) -> rusqlite::Result<usize> {
-        self.conn()
-            .execute("DELETE FROM captures WHERE id <= ?1", [max_id])
     }
 
     pub fn sweep(&self, now_ms: i64) -> rusqlite::Result<usize> {
@@ -225,17 +222,13 @@ mod tests {
     }
 
     #[test]
-    fn delete_through_keeps_newer_rows() {
+    fn unchanged_page_keeps_one_row_but_moves_its_time_up() {
         let buffer = Buffer::open_in_memory();
-        buffer.insert(&capture(1_000, "/a", "a", "h1")).unwrap();
-        buffer.insert(&capture(2_000, "/b", "b", "h2")).unwrap();
-        let max_id = buffer.read_all().unwrap().last().unwrap().id;
-        buffer.insert(&capture(3_000, "/c", "c", "h3")).unwrap();
-
-        assert_eq!(buffer.delete_through(max_id).unwrap(), 2);
+        assert!(buffer.insert(&capture(1_000, "/a", "a", "h1")).unwrap());
+        assert!(!buffer.insert(&capture(9_000, "/a", "a", "h1")).unwrap());
         let rows = buffer.read_all().unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].path, "/c");
+        assert_eq!(rows[0].captured_at, 9_000);
     }
 
     #[test]
