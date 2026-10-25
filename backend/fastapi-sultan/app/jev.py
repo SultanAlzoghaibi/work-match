@@ -48,8 +48,9 @@ def score_candidates(
         questions[f"c{index}"] = {
             "type": "noul",
             # Criteria, topic labels and MATCH_THRESHOLD=0.45 were measured
-            # together in backend/match-eval ("general-agnostic"): 96% of 105
-            # labelled pairs right, 100% on different city / event / company.
+            # together in backend/match-eval ("related"): 96% of 105 labelled
+            # pairs right, and more related pairs pass than "general-agnostic"
+            # (90 vs 84 of 137), e.g. interview coding vs system design.
             # Change them together and re-run the eval.
             "instructions": (
                 f"Are Me and Person {index} doing the same kind of activity, so that "
@@ -61,7 +62,9 @@ def score_candidates(
                     "goal, so they could help or motivate each other right now. The details "
                     "can differ: different problems, materials, tools or stages of the same "
                     "subject still count, and so does one person learning the subject while "
-                    "the other practices or applies it."
+                    "the other practices or applies it. Two different parts of preparing "
+                    "for the same goal also count, like different skills or sections for "
+                    "the same exam, interview or application."
                 ),
                 "false": (
                     "Their activities are different, or they only share a broad category of "

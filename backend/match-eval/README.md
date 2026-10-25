@@ -36,6 +36,23 @@ label, different subject or city) and plain unrelated pairs.
 
 ## Results
 
+### More tolerant wording (2026-10-24, threshold kept at 0.45)
+
+Goal: let more related pairs match without matching different fields. 105 counted pairs
+plus 16 borderline (`unsure`) and 16 more from ranking groups, 137 scored in all:
+
+| Variant | Right | Pass at 0.45 | Change |
+|---|---|---|---|
+| `general-agnostic` (was production) | 96% | 84 / 137 | |
+| **`related` (production now)** | **96%** | **90 / 137** | + "Two different parts of preparing for the same goal also count, like different skills or sections for the same exam, interview or application." |
+| `relate` | 92% | 88 / 137 | question asks whether they'd *relate* to each other's work |
+| `tolerant` | 84% | 109 / 137 | "same broad area" counts: matches Spanish vs French, SWE vs nursing jobs |
+
+`related` lifts interview coding vs system design 0.31 → 0.78 and coding vs behavioral
+prep 0.30 → 0.67, fixes Chicago vs Austin apartments, and adds one wrong match (LeetCode vs
+job applications, 0.73). `relate` is looser on borderlines but also matches MCAT vs LSAT
+and same-company different roles.
+
 ### Different company (2026-10-24, `company_pairs.json` added)
 
 11 new pairs (10 counted): the same marketing, sales, engineering, data, recruiting or

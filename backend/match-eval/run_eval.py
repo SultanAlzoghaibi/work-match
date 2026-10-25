@@ -165,13 +165,50 @@ GENERAL_AGNOSTIC_CRITERIA = {
 }
 
 
+# More tolerant of specific differences: related work in the same broad area
+# counts, not only the same subject. Still general wording (no subjects,
+# places or jobs from the pair files).
+TOLERANT_CRITERIA = {
+    "true": (
+        "Their work is in the same broad area and close enough that working side by side "
+        "would feel relevant or motivating, even if the specifics differ: a different "
+        "problem, topic, tool, stage, city, company, role or event still counts, and so do "
+        "closely related tasks toward the same kind of goal (one learning a subject while "
+        "the other practices it, or two different parts of preparing for the same thing)."
+    ),
+    "false": (
+        "Their work is in clearly different areas, so working side by side wouldn't help, "
+        "or the only thing they share is a very broad category, an app or a tool."
+    ),
+}
+
+
+# general-agnostic plus one tolerant line: different parts of preparing for the
+# same goal count. Keeps "different subject or field" as a no.
+RELATED_CRITERIA = {
+    "true": (
+        GENERAL_CRITERIA["true"]
+        + " Two different parts of preparing for the same goal also count, like different"
+        " skills or sections for the same exam, interview or application."
+    ),
+    "false": GENERAL_AGNOSTIC_CRITERIA["false"],
+}
+
+
 def line(prefix: str, side: dict, with_topic: bool) -> str:
     if with_topic and side.get("topic"):
         return f"{prefix} ({side['topic']}): {side['task_summary']}"
     return f"{prefix}: {side['task_summary']}"
 
 
-def ask_jev(key: str, me: dict, others: list[dict], with_topic: bool, criteria: dict | None, sultan) -> list[float]:
+RELATE_QUESTION = (
+    "Would Me and Person {index} relate to what the other is working on, so that working "
+    "side by side would feel natural and motivating for both?"
+)
+
+
+def ask_jev(key: str, me: dict, others: list[dict], with_topic: bool, criteria: dict | None, sultan,
+            question: str | None = None) -> list[float]:
     """Same request shape as production; only the state lines / criteria change."""
     state = [line("Me", me, with_topic)]
     questions = {}
@@ -179,7 +216,7 @@ def ask_jev(key: str, me: dict, others: list[dict], with_topic: bool, criteria: 
         state.append(line(f"Person {index}", other, with_topic))
         questions[f"c{index}"] = {
             "type": "noul",
-            "instructions": (
+            "instructions": question.format(index=index) if question else (
                 f"Are Me and Person {index} doing the same kind of activity, so that "
                 "working side by side would help them both?"
             ),
@@ -362,6 +399,9 @@ def main() -> None:
             "general": lambda me, others: ask_jev(key, me, others, True, GENERAL_CRITERIA, sultan),
             "general-no-place": lambda me, others: ask_jev(key, me, others, True, GENERAL_NO_PLACE_CRITERIA, sultan),
             "general-agnostic": lambda me, others: ask_jev(key, me, others, True, GENERAL_AGNOSTIC_CRITERIA, sultan),
+            "tolerant": lambda me, others: ask_jev(key, me, others, True, TOLERANT_CRITERIA, sultan),
+            "related": lambda me, others: ask_jev(key, me, others, True, RELATED_CRITERIA, sultan),
+            "relate": lambda me, others: ask_jev(key, me, others, True, RELATED_CRITERIA, sultan, RELATE_QUESTION),
             # Same request (cached once), combined four ways.
             "two-goal": lambda me, others: [g for a, g in ask_two(key, me, others, sultan)],
             "two-product": lambda me, others: [a * g for a, g in ask_two(key, me, others, sultan)],
