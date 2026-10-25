@@ -123,9 +123,10 @@ forced to `LeetCode` (`canonical_topic` in `summarizer.rs`).
 3. **Extension:** load `extension/` unpacked in Chrome (see
    [extension/README.md](../extension/README.md)). Its ID must be
    `cifmncfppiahnojgipabfaaifahknecg`.
-4. **Run:** `cd tauri && yarn tauri dev`. Then turn on **Share my activity** in the tray
-   menu (right-click the globe). It's off by default and the setting is remembered
-   (`curr_user_profile.sharing_enabled`).
+4. **Run:** `cd tauri && yarn tauri dev`. Activity sharing is always on, so the app tracker,
+   Chrome capture and summaries run while the app is open. **Friend finding** (in the tray
+   menu, or click the Earth on the Work friends tab) decides whether summaries are pushed to
+   the backend. While it's off, nothing leaves the laptop.
 
 Only one instance can capture, because the ports are fixed. When you run two instances
 (`yarn dev1` and `yarn dev2`), the second one:
