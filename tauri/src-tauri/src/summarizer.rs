@@ -23,8 +23,10 @@ similar work. Read the apps and pages from the last few minutes and output ONLY 
 "activity": first, in your own words, the general field or hobby this belongs to, in 1 or 2
 words, as you would name a school club for it. Never the specific task, page, subject or
 title, and never a tool.
-"topic": then the label from this list that means the same as "activity", or Other when none
-does. Decide by what the person is doing, not by the tools, commands or apps on screen:
+"topic": then a short label (1 to 3 words) for the general kind of activity, worded the way
+anyone doing the same thing would get it. These are common examples: reuse one when it really
+means the same thing, otherwise write your own (for example Travel planning, Cooking, Fitness,
+Language learning). Decide by what the person is doing, not by the tools, commands or apps on screen:
 - Coding: writing, debugging or setting up software, including reading its docs and tutorials
 - Web development: websites, web apps, frontends, backends and APIs
 - App development: mobile or desktop apps
@@ -37,8 +39,9 @@ does. Decide by what the person is doing, not by the tools, commands or apps on 
 - Coursework: homework, labs and projects for a class
 - Music: practicing an instrument, composing, producing or mixing music
 - LeetCode: coding interview practice problems
-- Job hunting, Apartment hunting, Shopping: searching for those
-- Other: none of these means the same as "activity"
+- Job hunting: looking for jobs or internships
+- Apartment hunting: looking for a place to live
+- Shopping: looking for things to buy
 "focus": 2 to 4 words naming the specific subject inside that topic: the project,
 problem, concept, course material or place they are working on. Never a tool, app,
 website, command or file name, and never just the topic again.
@@ -85,8 +88,10 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
             // Written first, in the model's own words, so the list below doesn't force
             // an activity into the nearest label. Used as the topic when that's Other.
             "activity":     { "type": "string", "maxLength": 24 },
-            // The list keeps common activities on one topic.
-            "topic":        { "type": "string", "enum": KNOWN_TOPICS.iter().copied().chain([OTHER_TOPIC]).collect::<Vec<_>>() },
+            // Free text: the prompt's list is examples, not a forced choice (a forced
+            // list squeezed flights into "Job hunting"). canonical_topic snaps the
+            // common ones to one spelling.
+            "topic":        { "type": "string", "maxLength": 40 },
             "focus":        { "type": "string", "maxLength": 40 },
             "task_summary": { "type": "string" }
         },
@@ -610,7 +615,7 @@ fn clean_topic(topic: &str) -> String {
 /// label. Keep the label when the two agree (same label, or a shared word: "Ui design" /
 /// Design, "Job searching" / Job hunting); otherwise trust the model's own words.
 /// Other names the model uses for a list label, so its own words map back onto the list.
-const TOPIC_ALIASES: [(&str, &str); 22] = [
+const TOPIC_ALIASES: [(&str, &str); 24] = [
     ("programming", "Coding"),
     ("software development", "Coding"),
     ("software engineering", "Coding"),
@@ -627,6 +632,8 @@ const TOPIC_ALIASES: [(&str, &str); 22] = [
     ("real estate", "Apartment hunting"),
     ("housing", "Apartment hunting"),
     ("apartment search", "Apartment hunting"),
+    ("house hunting", "Apartment hunting"),
+    ("home search", "Apartment hunting"),
     ("job search", "Job hunting"),
     ("careers", "Job hunting"),
     ("career", "Job hunting"),
@@ -650,10 +657,16 @@ fn reconcile_topic(label: &str, activity: &str) -> String {
     if own.eq_ignore_ascii_case(label) {
         return label.to_string();
     }
+    // Generic action words say nothing about the subject: "Flight hunting" shares
+    // "hunting" with Job hunting but isn't job hunting. Only subject words count.
+    const GENERIC: [&str; 14] = [
+        "and", "for", "the", "with", "hunting", "hunt", "search", "searching", "looking",
+        "finding", "browsing", "booking", "planning", "research",
+    ];
     let words = |text: &str| -> Vec<String> {
         text.to_lowercase()
             .split(|c: char| !c.is_alphanumeric())
-            .filter(|word| word.len() > 2 && !["and", "for", "the", "with"].contains(word))
+            .filter(|word| word.len() > 2 && !GENERIC.contains(word))
             .map(str::to_string)
             .collect()
     };
@@ -1007,6 +1020,15 @@ mod tests {
         assert_eq!(leetcode_topic("Coding", &neetcode, &[]).as_deref(), Some("LeetCode"));
         let neetcode_tab = [app("Google Chrome", "Meeting Schedule - NeetCode", 0, 60_000)];
         assert_eq!(leetcode_topic("Web development", &[], &neetcode_tab).as_deref(), Some("LeetCode"));
+    }
+
+    #[test]
+    fn generic_words_alone_dont_keep_a_label() {
+        // Seen live: "Searching for flights to Vancouver" came out as Job hunting.
+        assert_eq!(reconcile_topic("Job hunting", "Flight hunting"), "Flight hunting");
+        assert_eq!(reconcile_topic("Job hunting", "House hunting"), "Apartment hunting");
+        assert_eq!(reconcile_topic("Job hunting", "Job searching"), "Job hunting");
+        assert_eq!(reconcile_topic("Design", "Ui design"), "Design");
     }
 
     #[test]

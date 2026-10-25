@@ -31,6 +31,19 @@ A case passes when the shareable decision is right, the topic is one of `good_to
 and the topic contains none of `bad_words` (tool, app and site names). `unsure` cases are
 judgment calls, so they're shown but not counted.
 
+## Topic list as examples (2026-10-25)
+
+The list in the prompt is now examples, not a forced choice: `topic` is free text (the
+schema no longer has an `enum`), there's no "Other", and Job hunting / Apartment hunting /
+Shopping each get their own line. The forced list had squeezed "Searching for flights to
+Vancouver" into Job hunting. `canonical_topic` still snaps the common labels to one spelling.
+
+| Set | Forced list | Examples |
+|---|---|---|
+| `cases.json` (24 counted) | 22/24 | 22/24 |
+| `holdout.json` (10) | 10/10 | 9/10 (resume next to LinkedIn → Writing) |
+| `offlist.json` | 14/16 | 22/22 (Travel planning, Knitting, Fitness, Chess study, …) |
+
 ## Results (2026-10-24, Llama 3.2 3B Q4_K_M)
 
 | Set | `main` | This branch |
