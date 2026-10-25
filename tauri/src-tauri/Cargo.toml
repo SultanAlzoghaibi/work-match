@@ -26,9 +26,10 @@ tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 tokio = { version = "1", features = ["net", "time", "sync"] }
-# rustls: the deployed backend (yarn prod -> https://work-match-api.vercel.app)
-# needs HTTPS. Without it every poll and push to it fails, so no match popups.
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+# The deployed backend (yarn prod -> https://work-match-api.vercel.app) needs
+# HTTPS; without a TLS backend every poll and push fails, so no match popups.
+# The TLS backend is picked per OS below (rustls on macOS, Windows' own on Windows).
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
 regex = "1"
 url = "2"
 sha2 = "0.10"
@@ -39,6 +40,9 @@ getrandom = "0.3"
 tokio = { version = "1", features = ["macros", "rt"] }
 tower = { version = "0.5", features = ["util"] }
 
+[target.'cfg(not(windows))'.dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 # collecting_data/app_tracker.rs: focused window title + document via Accessibility.
@@ -46,6 +50,9 @@ accessibility-sys = "0.2"
 core-foundation = "0.10"
 
 [target.'cfg(windows)'.dependencies]
+# native-tls = Windows' built-in TLS (SChannel): nothing extra to install,
+# unlike rustls' aws-lc, which needs NASM/CMake to build on Windows.
+reqwest = { version = "0.13", default-features = false, features = ["native-tls"] }
 # Same version Tauri already uses. app_tracker.rs: foreground app + window
 # title; llm.rs: a job object so llama-server dies with the app; lib.rs:
 # rounded corners on the match popup.
