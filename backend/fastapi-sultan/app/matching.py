@@ -23,16 +23,13 @@ def _active_threshold() -> float:
     return float(os.environ.get("ACTIVE_TOPIC_THRESHOLD", "0.8"))
 
 
-def _match_cooldown_minutes() -> int:
-    """How long a pair isn't matched again after any match between them.
-
-    Covers declined pairs (1 day per docs/DATABASE.md) and also pairs that just
-    matched, since the app re-pushes every few seconds during a session. Use a
-    short value like 1 in .env while testing. DECLINE_COOLDOWN_MINUTES is the
-    old name.
+def _decline_block_hours() -> float:
+    """After either person declines, the pair isn't shown to each other again
+    for this long. It's the only thing that keeps a pair apart: matching or
+    already being connected doesn't (an open popup still blocks a second one,
+    see create_match, and both accepting turns friend finding off for the call).
     """
-    value = os.environ.get("MATCH_COOLDOWN_MINUTES") or os.environ.get("DECLINE_COOLDOWN_MINUTES")
-    return int(value or "1440")
+    return float(os.environ.get("DECLINE_BLOCK_HOURS", "24"))
 
 
 CANDIDATES_SQL = """
@@ -56,14 +53,11 @@ where t.user_id <> %(me)s
   and (cardinality(coalesce(cf.countries, '{}')) = 0 or me.country = any(cf.countries))
   and (not (coalesce(mf.shared_language, false) or coalesce(cf.shared_language, false))
        or u.languages && me.languages)                                -- share at least one language
-  and not exists (                                                    -- already connected on topic
-      select 1 from connections c
-      where c.user_a = least(%(me)s, t.user_id) and c.user_b = greatest(%(me)s, t.user_id)
-        and c.topic = %(topic)s)
-  and not exists (                                                    -- matched recently
+  and not exists (                                                    -- declined in the last 24 h
       select 1 from matches m
       where m.user_a = least(%(me)s, t.user_id) and m.user_b = greatest(%(me)s, t.user_id)
-        and m.created_at > now() - make_interval(mins => %(cooldown)s))
+        and 'declined' in (m.a_status, m.b_status)
+        and m.created_at > now() - make_interval(secs => %(decline_block)s * 3600))
 order by t.pushed_at desc
 limit %(limit)s
 """
@@ -119,7 +113,7 @@ def _find_match(conn, me: UUID, my_summary: str, topic: str, filters, log: dict)
             "same_age_group": filters.same_age_group,
             "my_age_group": profile["age_group"],
             "topic": topic,
-            "cooldown": _match_cooldown_minutes(),
+            "decline_block": _decline_block_hours(),
             "limit": jev.MAX_CANDIDATES,
         },
     ).fetchall()
@@ -127,7 +121,7 @@ def _find_match(conn, me: UUID, my_summary: str, topic: str, filters, log: dict)
     if not candidates:
         result["skipped_reason"] = (
             "no one available: nobody else is sharing a task that fits your filters, "
-            "or you were matched with them recently"
+            "or they declined a match with you in the last 24 hours"
         )
         log["outcome"] = "no_candidates"
         return result
