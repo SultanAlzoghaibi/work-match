@@ -162,7 +162,7 @@ async fn topic_eval() {
     for case in &cases.cases {
         let (captures, apps) = inputs(case);
         let raw = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-        let summary = summarize(&captures, &apps, None, NOW, 5, |prompt| {
+        let summary = summarize(&captures, &apps, NOW, 5, |prompt| {
             let client = client.clone();
             let url = url.clone();
             let raw = raw.clone();

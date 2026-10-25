@@ -247,9 +247,6 @@ pub fn start(app: AppHandle) {
     let db_path = crate::db::get_db_path(&app);
 
     tauri::async_runtime::spawn(async move {
-        // The topic is remembered with the sharing epoch it was learned in, so a
-        // pause forgets it along with the buffer.
-        let mut previous_topic = last_shareable_topic(&buffer).map(|topic| (sharing.epoch(), topic));
         dev.set_next_summary_at(buffer::now_ms() + first_run.as_millis() as i64);
         tokio::time::sleep(first_run).await;
         let mut ticker = tokio::time::interval(every);
@@ -260,7 +257,7 @@ pub fn start(app: AppHandle) {
             dev.set_next_summary_at(buffer::now_ms() + every.as_millis() as i64);
             let apps = recent_apps(db_path.as_deref(), window_minutes);
             if let Some(summary) =
-                run_once(&buffer, &sharing, &llm, &dev, &apps, &mut previous_topic, window_minutes).await
+                run_once(&buffer, &sharing, &llm, &dev, &apps, window_minutes).await
             {
                 let _ = app.emit("activity-summary", &summary);
                 crate::api::on_summary(&app, &summary);
@@ -290,9 +287,8 @@ pub async fn summarize_now(app: AppHandle) -> Result<ActivitySummary, String> {
     }
     const WINDOW_MINUTES: u32 = 5;
     println!("[summarizer] summarize now (requested from the app)");
-    let mut previous_topic = last_shareable_topic(&buffer).map(|topic| (sharing.epoch(), topic));
     let apps = recent_apps(crate::db::get_db_path(&app).as_deref(), WINDOW_MINUTES);
-    let summary = run_once(&buffer, &sharing, &llm, &dev, &apps, &mut previous_topic, WINDOW_MINUTES)
+    let summary = run_once(&buffer, &sharing, &llm, &dev, &apps, WINDOW_MINUTES)
         .await
         .ok_or("sharing was turned off while summarizing")?;
     let _ = app.emit("activity-summary", &summary);
@@ -308,7 +304,6 @@ async fn run_once(
     llm: &Llm,
     dev: &DevState,
     apps: &[AppSession],
-    previous_topic: &mut Option<(u64, String)>,
     window_minutes: u32,
 ) -> Option<ActivitySummary> {
     if !sharing.is_on() {
@@ -326,14 +321,10 @@ async fn run_once(
         // If it isn't ready in time, chat() fails fast and the summary falls back.
         llm.wait_ready(READY_WAIT).await;
     }
-    let hint = previous_topic
-        .as_ref()
-        .filter(|(learned_in, _)| *learned_in == epoch)
-        .map(|(_, topic)| topic.as_str());
     // Record what the model read and replied, for the Dev tab.
     let seen = Arc::new(std::sync::Mutex::new((None::<String>, Vec::<String>::new())));
     let started_at = buffer::now_ms();
-    let summary = summarize(&captures, apps, hint, started_at, window_minutes, |prompt| {
+    let summary = summarize(&captures, apps, started_at, window_minutes, |prompt| {
         let llm = llm.clone();
         let seen = seen.clone();
         seen.lock().unwrap().0 = Some(prompt.clone());
@@ -364,9 +355,6 @@ async fn run_once(
     if !sharing.is_on() || sharing.epoch() != epoch {
         return None;
     }
-    if summary.shareable {
-        *previous_topic = Some((epoch, summary.topic.clone()));
-    }
     let saved = serde_json::to_string(&summary)
         .map_err(|err| err.to_string())
         .and_then(|json| buffer.save_last_summary(summary.created_at, &json).map_err(|err| err.to_string()));
@@ -384,7 +372,6 @@ async fn run_once(
 pub async fn summarize<F, Fut>(
     captures: &[Capture],
     apps: &[AppSession],
-    previous_topic: Option<&str>,
     now: i64,
     window_minutes: u32,
     mut ask_model: F,
@@ -398,7 +385,7 @@ where
     if captures.is_empty() && apps.is_empty() {
         return ActivitySummary::not_shareable(Source::Idle, now, window_minutes);
     }
-    let prompt = build_prompt(&captures, &apps, previous_topic);
+    let prompt = build_prompt(&captures, &apps);
     if crate::collecting_data::debug_logs() {
         println!(
             "[summarizer] ---- what the model reads ({} pages, {} app sessions) ----\n{prompt}\n[summarizer] ---- end ----",
@@ -439,13 +426,11 @@ where
 
 /// Apps in front (with time spent) first, then pages newest first, one entry
 /// per page (its latest text), within MAX_PROMPT_CHARS.
-fn build_prompt(captures: &[Capture], apps: &[AppSession], previous_topic: Option<&str>) -> String {
+// Each summary stands alone: no previous topic or summary goes in. A
+// "Previous topic" hint made the small model keep stale labels (Zillow
+// browsing stayed "Coding", a biology quiz stayed "Web development").
+fn build_prompt(captures: &[Capture], apps: &[AppSession]) -> String {
     let mut prompt = String::new();
-    if let Some(topic) = previous_topic {
-        prompt.push_str(&format!(
-            "Previous topic: {topic} (reuse this exact label if the activity is the same)\n\n"
-        ));
-    }
     prompt.push_str(&apps_section(apps));
     if captures.is_empty() {
         return prompt;
@@ -684,12 +669,6 @@ fn canonical_topic(topic: &str, task_summary: &str) -> String {
     topic.to_string()
 }
 
-fn last_shareable_topic(buffer: &Buffer) -> Option<String> {
-    let json = buffer.last_summary().ok()??;
-    let summary: ActivitySummary = serde_json::from_str(&json).ok()?;
-    summary.shareable.then_some(summary.topic)
-}
-
 #[tauri::command]
 pub fn get_last_summary(buffer: State<'_, Buffer>) -> Result<Option<ActivitySummary>, String> {
     let Some(json) = buffer.last_summary().map_err(|err| err.to_string())? else {
@@ -809,7 +788,7 @@ mod tests {
     #[tokio::test]
     async fn no_captures_is_idle_without_calling_the_model() {
         let mut calls = 0;
-        let summary = summarize(&[], &[], None, NOW, 5, |_| {
+        let summary = summarize(&[], &[], NOW, 5, |_| {
             calls += 1;
             async { Err("unused".to_string()) }
         })
@@ -821,7 +800,7 @@ mod tests {
     #[tokio::test]
     async fn falls_back_after_a_failed_retry() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| {
+        let summary = summarize(&leetcode(), &[], NOW, 5, |_| {
             calls += 1;
             async { Err("connection refused".to_string()) }
         })
@@ -833,7 +812,7 @@ mod tests {
     #[tokio::test]
     async fn bad_json_twice_falls_back() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| {
+        let summary = summarize(&leetcode(), &[], NOW, 5, |_| {
             calls += 1;
             async { Ok("{\"topic\": \"LeetCode\"".to_string()) }
         })
@@ -845,7 +824,7 @@ mod tests {
     #[tokio::test]
     async fn succeeds_on_the_retry() {
         let mut calls = 0;
-        let summary = summarize(&leetcode(), &[], None, NOW, 5, |prompt| {
+        let summary = summarize(&leetcode(), &[], NOW, 5, |prompt| {
             calls += 1;
             let first_try = calls == 1;
             async move {
@@ -866,7 +845,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejected_output_is_blank_and_not_shareable() {
-        let summary = summarize(&leetcode(), &[], None, NOW, 5, |_| async {
+        let summary = summarize(&leetcode(), &[], NOW, 5, |_| async {
             Ok(reply("Job hunting", "Emailing recruiter jane@example.com"))
         })
         .await;
@@ -880,9 +859,9 @@ mod tests {
             capture(2, "www.zillow.com", "/oakland-ca/rentals/", "Oakland Rentals", &"z".repeat(5_000)),
             capture(3, "leetcode.com", "/problems/course-schedule/", "Course Schedule - LeetCode", "new text"),
         ];
-        let prompt = build_prompt(&captures, &[], Some("LeetCode"));
+        let prompt = build_prompt(&captures, &[]);
 
-        assert!(prompt.starts_with("Previous topic: LeetCode"));
+        assert!(!prompt.contains("Previous topic"), "no carry-over between summaries");
         let leetcode_at = prompt.find("leetcode.com/problems/course-schedule | Course Schedule").unwrap();
         let zillow_at = prompt.find("www.zillow.com/oakland-ca/rentals | Oakland Rentals").unwrap();
         assert!(leetcode_at < zillow_at, "newest first");
@@ -894,7 +873,7 @@ mod tests {
         let many: Vec<_> = (0..20)
             .map(|id| capture(id, "example.com", &format!("/page/{id}"), "Page", &"x".repeat(800)))
             .collect();
-        assert!(build_prompt(&many, &[], None).chars().count() < MAX_PROMPT_CHARS + 100);
+        assert!(build_prompt(&many, &[]).chars().count() < MAX_PROMPT_CHARS + 100);
     }
 
     fn app(name: &str, title: &str, started_at: i64, ended_at: i64) -> AppSession {
@@ -924,7 +903,7 @@ mod tests {
             app("Code", "dijkstra.py", 60_000, 300_000),
             app("Chrome", "Two Sum - LeetCode", 300_000, 360_000),
         ];
-        let prompt = build_prompt(&[], &apps, None);
+        let prompt = build_prompt(&[], &apps);
         let code = prompt.find("Code: dijkstra.py (4 min)").expect("code line");
         let chrome = prompt.find("Chrome: Two Sum - LeetCode (2 min)").expect("merged chrome line");
         assert!(code < chrome);
@@ -1020,7 +999,7 @@ mod tests {
             capture(4, "leetcode.com", "/problems/two-sum/", "Two Sum - LeetCode", "Given an array"),
         ];
         let apps = [app("Messages", "Mom", 0, 60_000), app("Google Chrome", "Inbox (3) - Gmail", 0, 60_000)];
-        let summary = summarize(&captures, &apps, None, NOW, 5, |prompt| async move {
+        let summary = summarize(&captures, &apps, NOW, 5, |prompt| async move {
             for private in ["mail.google", "chase", "mychart", "Messages", "Gmail", "Ferritin"] {
                 assert!(!prompt.contains(private), "{private} reached the model");
             }
@@ -1030,7 +1009,7 @@ mod tests {
         .await;
         assert!(summary.shareable);
 
-        let only_private = summarize(&captures[..3], &apps, None, NOW, 5, |_| async {
+        let only_private = summarize(&captures[..3], &apps, NOW, 5, |_| async {
             Err::<String, _>("the model must not be called".to_string())
         })
         .await;
@@ -1040,7 +1019,7 @@ mod tests {
     #[tokio::test]
     async fn app_sessions_alone_are_summarized_not_idle() {
         let apps = [app("Code", "dijkstra.py", 0, 300_000)];
-        let summary = summarize(&[], &apps, None, NOW, 5, |_| async {
+        let summary = summarize(&[], &apps, NOW, 5, |_| async {
             Ok(reply("Coursework", "Implementing Dijkstra's algorithm"))
         })
         .await;
