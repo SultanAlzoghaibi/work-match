@@ -25,11 +25,12 @@ def _active_threshold() -> float:
 
 def _decline_block_hours() -> float:
     """After either person declines, the pair isn't shown to each other again
-    for this long. It's the only thing that keeps a pair apart: matching or
-    already being connected doesn't (an open popup still blocks a second one,
-    see create_match, and both accepting turns friend finding off for the call).
+    for this long. Off by default (0) for the demo, so nothing keeps a pair
+    apart: set DECLINE_BLOCK_HOURS=24 to bring the block back. An open popup
+    still blocks a second one (create_match), and both accepting turns friend
+    finding off for the call.
     """
-    return float(os.environ.get("DECLINE_BLOCK_HOURS", "24"))
+    return float(os.environ.get("DECLINE_BLOCK_HOURS", "0"))
 
 
 CANDIDATES_SQL = """
@@ -53,7 +54,7 @@ where t.user_id <> %(me)s
   and (cardinality(coalesce(cf.countries, '{}')) = 0 or me.country = any(cf.countries))
   and (not (coalesce(mf.shared_language, false) or coalesce(cf.shared_language, false))
        or u.languages && me.languages)                                -- share at least one language
-  and not exists (                                                    -- declined in the last 24 h
+  and not exists (                                                    -- declined recently (off when 0)
       select 1 from matches m
       where m.user_a = least(%(me)s, t.user_id) and m.user_b = greatest(%(me)s, t.user_id)
         and 'declined' in (m.a_status, m.b_status)
@@ -120,8 +121,7 @@ def _find_match(conn, me: UUID, my_summary: str, topic: str, filters, log: dict)
     log["candidates"] = candidates
     if not candidates:
         result["skipped_reason"] = (
-            "no one available: nobody else is sharing a task that fits your filters, "
-            "or they declined a match with you in the last 24 hours"
+            "no one available: nobody else is sharing a task that fits your filters"
         )
         log["outcome"] = "no_candidates"
         return result
