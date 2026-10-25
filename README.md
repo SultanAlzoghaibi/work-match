@@ -37,6 +37,13 @@ quit or pause ──────────────────────
   follow on a topic. See [docs/DATABASE.md](docs/DATABASE.md) and the full walkthrough in
   [docs/USE_CASE.md](docs/USE_CASE.md).
 
+## Where your data goes
+
+![Where your data goes: my data, what stays on my laptop, and what the server stores](docs/privacy-diagram.svg)
+
+Pages and apps are filtered and summarized on the laptop by Llama 3.2. Only the short
+summary (`topic`, `focus`, `task_summary`) goes to the server.
+
 ## Repo layout
 
 - `backend/` – matching server and database schema (`schema.sql`)
