@@ -103,6 +103,12 @@ function statusSection(status, backendOk, onRefresh, onPushNow) {
       "div",
       { class: "dev-actions" },
       el("button", { class: "primary", onclick: onPushNow }, "⚡ Push now"),
+      // Mock data (match_popup.rs), never sent to the backend.
+      el(
+        "button",
+        { class: "secondary", title: "Shows the match popup with a made-up person", onclick: () => invoke("trigger_mock_match") },
+        "Trigger match found",
+      ),
       el("button", { class: "link", onclick: onRefresh }, "Refresh"),
     ),
   );

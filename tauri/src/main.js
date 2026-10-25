@@ -924,12 +924,6 @@ function renderFriendsTab() {
     friendFindingButton(),
     (summaryUi.card = el("div", { class: "summary-card" })),
     renderFriends(),
-    // Demo only: raise the liquid glass match popup with mock data.
-    el(
-      "button",
-      { class: "secondary trigger", onclick: () => invoke("trigger_mock_match") },
-      "Trigger match found",
-    ),
   );
 }
 
