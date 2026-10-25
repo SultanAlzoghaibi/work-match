@@ -41,6 +41,8 @@ pub struct MatchState {
     current: Mutex<Option<MatchView>>,
     /// Matches the user closed; polling never reopens them.
     dismissed: Mutex<HashSet<i64>>,
+    /// Matches that already turned friend finding off (once each).
+    paused_for_call: Mutex<HashSet<i64>>,
     /// Matches whose call was already opened automatically (once each).
     opened_calls: Mutex<HashSet<i64>>,
 }
@@ -124,6 +126,17 @@ fn on_poll<R: Runtime>(app: &tauri::AppHandle<R>, matches: Vec<MatchView>) {
             view.expired,
             if answerable { "showing popup" } else { "not answerable, no popup" }
         );
+    }
+    // Both said yes: stop looking so the call isn't interrupted by new
+    // matches. Once per match, so turning it back on during the call sticks.
+    let both_accepted = view.my_status == "accepted"
+        && view.rest.get("their_status").and_then(|status| status.as_str()) == Some("accepted");
+    if both_accepted
+        && state.paused_for_call.lock().unwrap().insert(view.match_id)
+        && crate::friend_finding::is_on(app)
+    {
+        println!("[match] both accepted match {}: turning friend finding off for the call", view.match_id);
+        crate::friend_finding::set(app, false);
     }
     show_state(app, view);
     if is_new && answerable {

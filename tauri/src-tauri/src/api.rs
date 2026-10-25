@@ -40,6 +40,10 @@ pub fn on_summary(app: &AppHandle, summary: &ActivitySummary) {
     let Some(payload) = push_payload(summary) else {
         return;
     };
+    if !crate::friend_finding::is_on(app) {
+        println!("[api] not pushed: friend finding is off");
+        return;
+    }
     let Some((api_url, user_id)) = crate::match_popup::backend_target(app) else {
         println!("[api] not pushed: the main window hasn't loaded the user yet");
         return;

@@ -1,5 +1,7 @@
-//! "Turn on friend finding" tray toggle. Search itself is a stub for now;
-//! while on, the tray icon plays a pulsing-dot animation.
+//! "Turn on friend finding": while it's on, activity summaries are pushed to
+//! the backend so you can be matched, and the tray Earth searches. Off stops
+//! the pushes and takes your task off the backend. It turns itself off when
+//! both people accept a match, so the call isn't interrupted by new matches.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -7,7 +9,7 @@ use std::time::Duration;
 
 use tauri::image::Image;
 use tauri::menu::CheckMenuItem;
-use tauri::{AppHandle, Emitter, Manager, State, Wry};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State, Wry};
 
 pub const TRAY_ID: &str = "main";
 const FRAME_MS: u64 = 90;
@@ -29,7 +31,11 @@ pub fn base_icon() -> Image<'static> {
     planet(false, 0.0)
 }
 
-pub fn set(app: &AppHandle, on: bool) {
+pub fn is_on<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<FriendFinding>().is_some_and(|state| state.is_on())
+}
+
+pub fn set<R: Runtime>(app: &AppHandle<R>, on: bool) {
     let flag = app.state::<FriendFinding>().0.clone();
     let was_on = flag.swap(on, Ordering::SeqCst);
     if let Some(item) = app.try_state::<FriendFindingMenuItem>() {
@@ -45,18 +51,29 @@ pub fn set(app: &AppHandle, on: bool) {
     }
 }
 
-// TODO: kick off the real friend search.
-fn start_search(_app: &AppHandle) {
-    println!("[friend-finding] on (stub)");
+// Nothing to start: the next summary (api::on_summary) pushes again.
+fn start_search<R: Runtime>(_app: &AppHandle<R>) {
+    println!("[friend-finding] on: summaries will be pushed");
 }
 
-// TODO: stop the real friend search.
-fn stop_search(_app: &AppHandle) {
-    println!("[friend-finding] off (stub)");
+/// Stop being matchable right away instead of waiting for curr_task to go
+/// stale (11 minutes): DELETE /users/{id}/task.
+fn stop_search<R: Runtime>(app: &AppHandle<R>) {
+    println!("[friend-finding] off: not pushing, removing your task from the backend");
+    let Some((api_url, user_id)) = crate::match_popup::backend_target(app) else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        let url = format!("{api_url}/users/{user_id}/task");
+        let result = async { reqwest::Client::new().delete(&url).send().await?.error_for_status() }.await;
+        if let Err(err) = result {
+            eprintln!("[friend-finding] removing the task failed: {err}");
+        }
+    });
 }
 
 /// Smiling Earth sweeps a magnifying glass and looks left and right until the flag goes off, then puts it back to sleep.
-fn spawn_animation(app: AppHandle, flag: Arc<AtomicBool>) {
+fn spawn_animation<R: Runtime>(app: AppHandle<R>, flag: Arc<AtomicBool>) {
     std::thread::spawn(move || {
         let frames: Vec<_> = (0..FRAMES)
             // Overdriven sine, clamped: it lingers a moment at each side.
