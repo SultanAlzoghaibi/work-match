@@ -274,7 +274,8 @@ def poll(user_id: UUID) -> list[dict]:
 
 
 # ACCEPT / DECLINE: set my side only, while I haven't answered, nobody has
-# declined and the 2-minute popup hasn't expired.
+# declined and the 2-minute popup hasn't expired. An accept can still become a
+# decline ("Changed my mind") until the other person answers.
 @app.post("/users/{user_id}/matches/{match_id}/respond", response_model=MatchView)
 def respond(user_id: UUID, match_id: int, body: RespondBody) -> dict:
     status = "accepted" if body.accept else "declined"
@@ -286,7 +287,12 @@ def respond(user_id: UUID, match_id: int, body: RespondBody) -> dict:
                 b_status = case when user_b = %(me)s then %(status)s else b_status end
             where id = %(id)s
               and %(me)s in (user_a, user_b)
-              and (case when user_a = %(me)s then a_status else b_status end) = 'pending'
+              and (
+                  (case when user_a = %(me)s then a_status else b_status end) = 'pending'
+                  or (%(status)s = 'declined'
+                      and (case when user_a = %(me)s then a_status else b_status end) = 'accepted'
+                      and (case when user_a = %(me)s then b_status else a_status end) = 'pending')
+              )
               and 'declined' not in (a_status, b_status)
               and created_at > now() - interval '2 minutes'
             returning id

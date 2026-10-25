@@ -193,10 +193,28 @@ function render(view) {
       closeButton(view),
     );
   } else if (view.my_status === "accepted") {
+    // People change their minds: until the other person answers, an accept
+    // can still be taken back. That declines the match and closes the popup.
+    const error = el("p", { class: "error" });
+    const withdraw = async () => {
+      error.textContent = "";
+      try {
+        await invoke("respond_match", { matchId: view.match_id, accept: false });
+        await invoke("dismiss_match", { matchId: view.match_id });
+      } catch (err) {
+        error.textContent = String(err);
+      }
+    };
     show(
       el("div", { class: "eyebrow" }, "🌍 Match found"),
       el("p", { class: "intro" }, "Waiting for ", el("strong", {}, name), " to answer…"),
       el("p", { class: "task" }, other.task_summary ?? ""),
+      error,
+      el(
+        "div",
+        { class: "actions" },
+        el("button", { class: "secondary", onclick: withdraw }, "Changed my mind"),
+      ),
     );
   } else {
     const error = el("p", { class: "error" });
