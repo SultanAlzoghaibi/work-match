@@ -64,7 +64,9 @@ def score_candidates(
                     "subject still count, and so does one person learning the subject while "
                     "the other practices or applies it. Two different parts of preparing "
                     "for the same goal also count, like different skills or sections for "
-                    "the same exam, interview or application."
+                    "the same exam, interview or application. The labels in parentheses "
+                    "are rough and can be worded differently for the same activity, so "
+                    "judge by what each person is actually doing."
                 ),
                 "false": (
                     "Their activities are different, or they only share a broad category of "

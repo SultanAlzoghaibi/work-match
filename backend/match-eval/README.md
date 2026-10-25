@@ -36,6 +36,16 @@ label, different subject or city) and plain unrelated pairs.
 
 ## Results
 
+### Labels are rough (2026-10-25)
+
+The summarizer's topic is now free text, so the same activity can carry different labels.
+The criteria add: "The labels in parentheses are rough and can be worded differently for
+the same activity, so judge by what each person is actually doing." Eval: 95% right, 91 of
+137 pass (was 96%, 90; one pair moved, within Jev's noise). Same activity with mismatched
+labels: LeetCode vs (Coding / Interview prep / Algorithms) 0.92–0.93, flights (Travel
+planning) vs flights (Job hunting) 0.90, apartments vs (Job hunting / Real estate) 0.85–0.91;
+unrelated pairs stay at 0.04–0.07.
+
 ### More tolerant wording (2026-10-24, threshold kept at 0.45)
 
 Goal: let more related pairs match without matching different fields. 105 counted pairs
