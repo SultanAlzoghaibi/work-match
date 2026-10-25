@@ -140,12 +140,14 @@ static COURSE_CODE: LazyLock<Regex> =
 /// Pages and apps the model never sees: email, messaging, banking and health.
 /// The prompt also says to ignore them, but the eval (summarizer-eval/) showed
 /// the model shares health pages anyway, so they're dropped here first.
-const PRIVATE_HOSTS: [&str; 24] = [
+/// Also work-match's own Jitsi calls (match_popup.rs) and Jitsi's sign-in page
+/// (meet-jit-si-*.firebaseapp.com): a call isn't the work it was matched on.
+const PRIVATE_HOSTS: [&str; 26] = [
     "mail.google.com", "outlook.live.com", "outlook.office.com", "mail.yahoo.com", "proton.me",
     "web.whatsapp.com", "messenger.com", "web.telegram.org", "discord.com", "slack.com",
     "chase.com", "bankofamerica.com", "wellsfargo.com", "capitalone.com", "paypal.com", "venmo.com",
     "rbc.com", "td.com", "mychart", "webmd.com", "healthline.com", "mayoclinic.org",
-    "patient.info", "zocdoc.com",
+    "patient.info", "zocdoc.com", "meet.jit.si", "meet-jit-si",
 ];
 const PRIVATE_APPS: [&str; 9] = [
     "Mail", "Messages", "Slack", "Discord", "WhatsApp", "Telegram", "Signal", "Messenger", "Outlook",
@@ -164,7 +166,7 @@ fn is_private_app(app: &AppSession) -> bool {
         // A browser window showing a private page (its title names the site).
         || app.window_title.as_deref().is_some_and(|title| {
             let title = title.to_lowercase();
-            ["gmail", "outlook", "mychart", "webmd", "online banking", "whatsapp"]
+            ["gmail", "outlook", "mychart", "webmd", "online banking", "whatsapp", "jitsi meet"]
                 .iter()
                 .any(|marker| title.contains(marker))
         })
@@ -567,14 +569,18 @@ const TOPIC_ALIASES: [(&str, &str); 22] = [
 
 fn reconcile_topic(label: &str, activity: &str) -> String {
     let own = clean_topic(&first_words(&scrub(activity), MAX_TOPIC_WORDS, MAX_TOPIC_CHARS));
-    if own.is_empty() || own.eq_ignore_ascii_case(label) || own.eq_ignore_ascii_case(OTHER_TOPIC) {
+    if own.is_empty() || own.eq_ignore_ascii_case(OTHER_TOPIC) {
         return label.to_string();
     }
     if let Some(known) = KNOWN_TOPICS.iter().find(|known| known.eq_ignore_ascii_case(&own)) {
         return known.to_string();
     }
+    // Before the same-as-label check: after Other, the label is these same words.
     if let Some((_, known)) = TOPIC_ALIASES.iter().find(|(alias, _)| alias.eq_ignore_ascii_case(&own)) {
         return known.to_string();
+    }
+    if own.eq_ignore_ascii_case(label) {
+        return label.to_string();
     }
     let words = |text: &str| -> Vec<String> {
         text.to_lowercase()
@@ -1014,6 +1020,41 @@ mod tests {
         })
         .await;
         assert_eq!(only_private, ActivitySummary::not_shareable(Source::Idle, NOW, 5));
+    }
+
+    #[tokio::test]
+    async fn our_own_video_calls_never_reach_the_model() {
+        let captures = vec![
+            capture(1, "meet.jit.si", "/workmatch-21-k3x9", "workmatch-21-k3x9 | Jitsi Meet", "Join meeting"),
+            capture(2, "meet-jit-si-66cbd.firebaseapp.com", "/__/auth/handler", "Sign in", "Continue with Google"),
+            capture(3, "www.zillow.com", "/san-francisco-ca/rentals/", "San Francisco CA Rentals", "1 bd apartment for rent"),
+        ];
+        let apps = [app("Google Chrome", "workmatch-21-k3x9 | Jitsi Meet", 0, 60_000)];
+        let summary = summarize(&captures, &apps, NOW, 5, |prompt| async move {
+            for call in ["jit.si", "jit-si", "Jitsi", "workmatch-21"] {
+                assert!(!prompt.contains(call), "{call} reached the model");
+            }
+            assert!(prompt.contains("www.zillow.com"));
+            Ok(reply("Apartment hunting", "Looking for a one-bedroom rental in San Francisco"))
+        })
+        .await;
+        assert!(summary.shareable);
+    }
+
+    #[tokio::test]
+    async fn other_with_a_known_synonym_lands_on_the_list() {
+        let zillow = [capture(1, "www.zillow.com", "/san-francisco-ca/rentals/", "San Francisco CA Rentals", "1 bd apartment for rent")];
+        let summary = summarize(&zillow, &[], NOW, 5, |_| async {
+            Ok(json!({
+                "shareable": true,
+                "topic": "Other",
+                "activity": "Real Estate",
+                "task_summary": "Looking for a one-bedroom rental in San Francisco",
+            })
+            .to_string())
+        })
+        .await;
+        assert_eq!(summary.topic, "Apartment hunting");
     }
 
     #[tokio::test]
