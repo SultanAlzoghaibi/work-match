@@ -52,7 +52,8 @@ pub fn open_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 }
 
 /// Hide the main window and drop back to a menu-bar-only app. The close
-/// button routes here too, so closing never quits; use the tray's Quit.
+/// button routes here too (and also turns friend finding off, see lib.rs), so
+/// closing never quits; use the tray's Quit.
 pub fn hide_main_window<R: Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(main_window) = app.get_webview_window(crate::MAIN_LABEL) {
         let _ = main_window.hide();

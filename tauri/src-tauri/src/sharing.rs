@@ -1,9 +1,12 @@
-// Whether the user is sharing their activity. While it is off nothing is
-// captured, summarized or pushed, and turning it off forgets what was buffered.
+// Whether activity is being tracked: the app tracker, Chrome capture and the
+// summarizer. It's on exactly while friend finding is (friend_finding::set is
+// the only switch), so it's off at every launch and after every quit. While it
+// is off nothing is captured, summarized or pushed, and turning it off forgets
+// what was buffered.
 use crate::buffer::Buffer;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 
 #[derive(Clone)]
 pub struct Sharing(Arc<Flags>);
@@ -39,33 +42,23 @@ impl Sharing {
     }
 }
 
-/// The one way sharing changes, from the tray or from the UI.
-pub fn set(app: &AppHandle, on: bool) {
+/// The one way tracking changes. Only friend_finding::set calls it, so
+/// tracking can't run without friend finding.
+pub fn set<R: Runtime>(app: &AppHandle<R>, on: bool) {
     app.state::<Sharing>().store(on);
     if !on {
-        // Sharing is already off either way; anything left behind is swept within 6 minutes.
+        // Tracking is already off either way; anything left behind is swept within 6 minutes.
         if let Err(err) = app.state::<Buffer>().clear_all() {
             eprintln!("[sharing] clearing the buffer failed: {err}");
         }
-        // TODO: tell the backend to delete curr_task (QUIT / PAUSE in backend/schema.sql).
     }
     crate::db::save_sharing_enabled(app, on);
-    println!("[sharing] {}", if on { "on" } else { "off" });
+    println!("[sharing] tracking {}", if on { "on" } else { "off" });
 }
 
 #[tauri::command]
 pub fn get_sharing(sharing: State<'_, Sharing>) -> bool {
     sharing.is_on()
-}
-
-/// Sharing is always on now (friend finding is the switch), so a request to
-/// turn it off is ignored.
-#[tauri::command]
-pub fn set_sharing(app: AppHandle, enabled: bool) {
-    if !enabled {
-        println!("[sharing] stays on: turn friend finding off instead");
-    }
-    set(&app, true);
 }
 
 #[cfg(test)]

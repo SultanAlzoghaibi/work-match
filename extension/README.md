@@ -7,7 +7,12 @@ See [docs/activity-capture.md](../docs/activity-capture.md) for the whole flow.
 
 ## What it captures
 
-The active tab of the focused Chrome window, when you:
+Nothing, unless the desktop app is running with **friend finding** on. Before each
+capture it asks the app (`POST http://127.0.0.1:47321/status`, answered
+`{"tracking": true|false}`) and reads no page unless the answer is `true`. Turning
+friend finding off, or quitting the app, stops it right away.
+
+While friend finding is on: the active tab of the focused Chrome window, when you:
 
 - switch tabs or windows,
 - finish loading a page (plus once more 3 s later, for pages that render late),
@@ -27,7 +32,8 @@ It skips:
 - pages Chrome won't let extensions script (the Web Store, PDFs, error pages),
 - everything while Chrome isn't the focused app.
 
-The extension stores nothing. If the desktop app isn't running, captures are dropped.
+The extension stores nothing. If the desktop app isn't running, the status check fails
+and no page is read.
 It logs only a page's host and text length (`console.debug`).
 
 ## Load it
@@ -62,7 +68,7 @@ lost, generate a new pair and update both `"key"` and `DEFAULT_EXTENSION_ID` in
 ## Files
 
 - `manifest.json`: MV3 manifest (`tabs`, `scripting`, `alarms`; host access to all URLs).
-- `background.js`: the service worker: triggers, filtering, injection, POST.
+- `background.js`: the service worker: triggers, filtering, the status check, injection, POST.
 - `extract.js`: runs in the page and returns the text.
 - `Readability.js`: copied unchanged from `@mozilla/readability` 0.6.0 (Apache-2.0;
   license header kept). To update it, run `npm i @mozilla/readability` in a temp folder

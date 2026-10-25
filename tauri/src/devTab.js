@@ -65,7 +65,11 @@ function statusSection(status, backendOk, onRefresh, onPushNow, onClear) {
   }[status.capture_server];
   return section(
     "Status",
-    check(status.sharing_on, "Share my activity", "always on: tracking apps + Chrome (friend finding decides what's pushed)"),
+    check(
+      status.sharing_on || null,
+      "Tracking (apps + Chrome)",
+      status.sharing_on ? "on while friend finding is on" : "off: nothing is tracked until you turn on friend finding",
+    ),
     check(capture[0], "Chrome capture server", capture[1]),
     check(
       status.last_capture_at ? true : false,

@@ -19,8 +19,9 @@ document.documentElement.classList.add(`os-${os}`); // os-macos, os-windows, os-
 // Rust polls GET /users/{id}/poll every 3 s and shows the match popup. Starts
 // once someone is signed in (see render).
 
-/// Per-device memory for "continue where you left off": last tab and whether
-/// friend finding was on. localStorage can be unavailable, so never rely on it.
+/// Per-device memory for "continue where you left off": last tab and theme.
+/// Never friend finding: it starts off every launch, so tracking only runs
+/// once you turn it on. localStorage can be unavailable, so never rely on it.
 const remember = {
   get(key) {
     try {
@@ -38,8 +39,8 @@ const remember = {
 
 const root = document.getElementById("root");
 
-// Cmd+Q (Ctrl+Q on Windows) quits the app, tray icon included. The red close
-// button only hides the window.
+// Cmd+Q (Ctrl+Q on Windows) quits the app, tray icon included. The close
+// button hides the window and turns friend finding off.
 document.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "q") {
     event.preventDefault();
@@ -173,7 +174,6 @@ function planetToggle() {
 
 listen("friend-finding", (event) => {
   friendFinding = event.payload;
-  remember.set("friend-finding", friendFinding ? "1" : "0");
   paintTitlebarStatus();
   for (const button of friendButtons) {
     if (button.isConnected) paintFriendButton(button);
@@ -223,7 +223,7 @@ function updateSummaryCard() {
   if (!latestSummary) {
     card.replaceChildren(
       el("h3", { class: "section-title" }, "Your summary"),
-      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Turn on friend finding, or press Push now in the Dev tab."),
+      el("p", { class: "muted fine-print" }, "Nothing pushed yet. Turn on friend finding to start."),
     );
     return;
   }
@@ -255,7 +255,6 @@ async function pushNow() {
   const note = (text) => {
     if (taskUi.pushNote) taskUi.pushNote.textContent = text;
   };
-  await ensureSharing().catch((err) => console.warn("couldn't turn sharing on", err));
   if (session) {
     if (session.pushing) return;
     session.nextPushAt = 0;
@@ -279,28 +278,7 @@ async function pushNow() {
   }
 }
 
-/// Searching means you want to be matched: turn Sharing on (locally and on
-/// the server) if it's off, so the backend doesn't skip you as "not sharing".
-async function ensureSharing() {
-  const profile = await loadProfile();
-  const trackingOn = await invoke("get_sharing").catch(() => false);
-  if (profile?.sharing_enabled && trackingOn) return;
-  await setSharing(true);
-}
-
-/// The one sharing switch: Thang's set_sharing turns real tracking on/off
-/// (tray "Share my activity", app tracker, Chrome capture, summarizer) and
-/// saves curr_user_profile.sharing_enabled; then the server is told too.
-async function setSharing(on) {
-  await invoke("set_sharing", { enabled: on }).catch((err) => console.warn("set_sharing failed", err));
-  const profile = await loadProfile();
-  if (profile) {
-    await updateUser(userId(), { ...profile, sharing_enabled: on }).catch((err) => console.warn("sharing sync failed", err));
-  }
-}
-
 async function startSession(kind, filters) {
-  await ensureSharing().catch((err) => console.warn("couldn't turn sharing on", err));
   // A demo search is friend finding: turn it on so the tray planet animates.
   if (!friendFinding) invoke("set_friend_finding", { enabled: true }).catch(console.error);
   const task = MOCK_TASKS[kind];
@@ -1197,9 +1175,6 @@ function resumeSession(profile) {
   setUserId(profile.user_id);
   invoke("start_match_polling", { userId: profile.user_id, apiUrl: API_URL }).catch(console.error);
   updateUser(profile.user_id, profile).catch((err) => console.warn("profile sync failed", err));
-  if (remember.get("friend-finding") === "1" && !friendFinding) {
-    invoke("set_friend_finding", { enabled: true }).catch(console.error);
-  }
 }
 
 async function render() {

@@ -178,12 +178,16 @@ pub fn run() {
             #[cfg(windows)]
             apply_window_style(&match_window);
 
-            // Red close button hides instead of quitting (Quit is in the tray).
+            // Close button (and Alt+F4) hides instead of quitting (Quit is in
+            // the tray), and turns friend finding off: closing the window always
+            // stops tracking. To keep searching, minimize instead, or turn it
+            // back on from the tray.
             let app_for_close = app.handle().clone();
             main_window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     window::hide_main_window(&app_for_close);
+                    friend_finding::set(&app_for_close, false);
                 }
             });
 
@@ -207,7 +211,6 @@ pub fn run() {
             friend_finding::set_friend_finding,
             friend_finding::planet_frames,
             sharing::get_sharing,
-            sharing::set_sharing,
             summarizer::get_last_summary,
             summarizer::summarize_now,
             collecting_data::app_tracker::get_app_sessions,
@@ -220,7 +223,8 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                // TODO: tell the backend to delete curr_task (QUIT / PAUSE in backend/schema.sql).
+                // Every way out (tray Quit, the window's Quit, Ctrl+Q) ends here.
+                friend_finding::stop_for_exit(app_handle);
                 if let Some(llm) = app_handle.try_state::<llm::Llm>() {
                     llm.shutdown();
                 }
@@ -236,10 +240,10 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     let buffer = buffer::Buffer::open(&data_dir.join(buffer::FILE_NAME))?;
     // Captured text never survives a restart.
     buffer.clear_captures()?;
-    // Activity sharing is always on; friend finding decides whether anything
-    // is pushed (api::on_summary). The stored flag is kept in sync for old code.
-    let sharing = sharing::Sharing::new(true);
-    db::save_sharing_enabled(app.handle(), true);
+    // Nothing is tracked until the user turns friend finding on (it starts off).
+    // The stored flag is kept in sync for old code.
+    let sharing = sharing::Sharing::new(false);
+    db::save_sharing_enabled(app.handle(), false);
 
     buffer::start_sweeper(buffer.clone());
     // Only one app can own the extension's port. The second dev instance
@@ -254,7 +258,7 @@ fn start_activity_capture(app: &tauri::App) -> Result<(), Box<dyn std::error::Er
     app.manage(sharing);
     app.manage(llm::start(app.handle()));
     summarizer::start(app.handle().clone());
-    // Which app / window is in front, while sharing is on (collecting_data/).
+    // Which app / window is in front, while friend finding is on (collecting_data/).
     collecting_data::app_tracker::start(app.handle().clone());
     Ok(())
 }

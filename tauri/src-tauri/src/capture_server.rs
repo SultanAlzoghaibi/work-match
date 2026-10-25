@@ -1,5 +1,7 @@
 // Localhost endpoint the Chrome extension posts tab text to. Only the
-// extension's origin is accepted; text is scrubbed before it is stored.
+// extension's origin is accepted; text is scrubbed before it is stored. The
+// extension asks /status before reading a page, and reads nothing unless
+// tracking (friend finding) is on.
 use crate::buffer::{self, Buffer, NewCapture};
 use crate::scrub::scrub;
 use crate::sharing::Sharing;
@@ -64,6 +66,7 @@ pub fn allowed_origin() -> String {
 pub fn router(state: CaptureState) -> Router {
     Router::new()
         .route("/capture", post(capture).options(preflight))
+        .route("/status", post(status).options(preflight))
         .with_state(state)
 }
 
@@ -132,6 +135,16 @@ fn has_allowed_origin(headers: &HeaderMap, allowed: &str) -> bool {
     headers
         .get(header::ORIGIN)
         .is_some_and(|origin| origin.as_bytes() == allowed.as_bytes())
+}
+
+/// {"tracking": bool}. POST, not GET, so Chrome always sends the Origin.
+async fn status(State(state): State<CaptureState>, headers: HeaderMap) -> Response {
+    if !has_allowed_origin(&headers, &state.allowed_origin) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    LAST_HEARD_AT.store(buffer::now_ms(), std::sync::atomic::Ordering::Relaxed);
+    let body = serde_json::json!({ "tracking": state.sharing.is_on() }).to_string();
+    ([(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))], body).into_response()
 }
 
 // The checks run in this order on purpose: nothing is read from a request
@@ -299,6 +312,37 @@ mod tests {
         assert_eq!(rows[0].host, "leetcode.com");
         assert_eq!(rows[0].path, "/problems/course-schedule/");
         assert_eq!(rows[0].text, "Ping me at [email] about course schedule");
+    }
+
+    async fn post_status(state: &CaptureState, origin: Option<&str>) -> (StatusCode, String) {
+        let mut request = Request::post("/status");
+        if let Some(origin) = origin {
+            request = request.header(header::ORIGIN, origin);
+        }
+        let response = router(state.clone())
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), MAX_BODY_BYTES).await.unwrap();
+        (status, String::from_utf8(body.to_vec()).unwrap())
+    }
+
+    #[tokio::test]
+    async fn status_tells_the_extension_whether_to_track() {
+        assert_eq!(
+            post_status(&test_state(true), Some(ORIGIN)).await,
+            (StatusCode::OK, r#"{"tracking":true}"#.to_string())
+        );
+        assert_eq!(
+            post_status(&test_state(false), Some(ORIGIN)).await,
+            (StatusCode::OK, r#"{"tracking":false}"#.to_string())
+        );
+        assert_eq!(post_status(&test_state(true), None).await.0, StatusCode::FORBIDDEN);
+        assert_eq!(
+            post_status(&test_state(true), Some("https://evil.example")).await.0,
+            StatusCode::FORBIDDEN
+        );
     }
 
     async fn preflight_status(state: &CaptureState, origin: &str) -> StatusCode {

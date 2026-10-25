@@ -1,8 +1,10 @@
 // work-match capture: reads the active tab's text and posts it to the
-// work-match desktop app on this computer. Nothing is stored in the extension;
-// if the app isn't running, the capture is dropped.
+// work-match desktop app on this computer. Nothing is stored in the extension.
+// It asks the app first and reads nothing unless the app is running with
+// friend finding on.
 
 const ENDPOINT = "http://127.0.0.1:47321/capture";
+const STATUS_ENDPOINT = "http://127.0.0.1:47321/status";
 const MAX_TEXT = 2000;
 const DEBOUNCE_MS = 1500;
 const LATE_RENDER_MS = 3000;
@@ -48,6 +50,7 @@ async function captureTab(tabId) {
     const tab = await chrome.tabs.get(tabId);
     const url = capturableUrl(tab);
     if (!url || !(await windowHasFocus(tab.windowId))) return;
+    if (!(await trackingOn())) return;
 
     await chrome.scripting.executeScript({ target: { tabId }, files: ["Readability.js"] });
     const [injection] = await chrome.scripting.executeScript({ target: { tabId }, files: ["extract.js"] });
@@ -63,6 +66,16 @@ async function captureTab(tabId) {
     // Expected: the tab closed, the page can't be scripted (Web Store, PDFs,
     // error pages), or the desktop app isn't running. Drop the capture.
   }
+}
+
+// Asked before every capture, so turning friend finding off (or quitting the
+// app) stops the extension reading pages right away. Throws when the app isn't
+// running, which drops the capture too.
+async function trackingOn() {
+  const response = await fetch(STATUS_ENDPOINT, { method: "POST" });
+  if (!response.ok) return false;
+  const { tracking } = await response.json();
+  return tracking === true;
 }
 
 // Normal web pages only: no incognito, nothing served from this computer.

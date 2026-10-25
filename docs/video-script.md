@@ -36,4 +36,4 @@ tabs, apps, page text   →  AI  →  "Building a website with React"
 - **"The AI runs on your computer":** Llama 3.2 3B runs locally through llama.cpp (`llama-server` on `127.0.0.1`).
 - **"Email, messages, banking and health are never read":** private sites and apps are filtered out before the AI sees anything. Jitsi calls are filtered too.
 - **"Turn any website on or off":** not in the app yet (see the note above).
-- **"One switch turns it all off":** turning friend finding off stops pushes and deletes your task from the server.
+- **"One switch turns it all off":** turning friend finding off stops all tracking (app tracker, Chrome extension, summaries), clears what was buffered, and deletes your task from the server. It's also off at every launch and turns off when you close the window or quit.

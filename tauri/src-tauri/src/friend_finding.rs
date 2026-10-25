@@ -1,7 +1,10 @@
-//! "Turn on friend finding": while it's on, activity summaries are pushed to
-//! the backend so you can be matched, and the tray Earth searches. Off stops
-//! the pushes and takes your task off the backend. It turns itself off when
-//! both people accept a match, so the call isn't interrupted by new matches.
+//! "Turn on friend finding": while it's on, your activity is tracked (app
+//! tracker, Chrome extension, summaries), summaries are pushed to the backend
+//! so you can be matched, and the tray Earth searches. Off stops all tracking,
+//! forgets what was buffered and takes your task off the backend. It's off at
+//! every launch and turns off when you quit, so tracking only ever runs because
+//! you turned it on. It also turns itself off when both people accept a match,
+//! so the call isn't interrupted by new matches.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -19,6 +22,8 @@ const FRAMES: usize = 28;
 const SLEEP_FRAMES: usize = 40;
 /// Searching frames where the eyes are shut: one quick blink per cycle.
 const BLINK_FRAMES: [usize; 2] = [6, 7];
+/// How long quitting waits for the backend to drop your task.
+const EXIT_WAIT: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
 pub struct FriendFinding(Arc<AtomicBool>);
@@ -55,21 +60,46 @@ pub fn set<R: Runtime>(app: &AppHandle<R>, on: bool) {
     }
 }
 
-// Nothing to start: the next summary (api::on_summary) pushes again.
-fn start_search<R: Runtime>(_app: &AppHandle<R>) {
-    println!("[friend-finding] on: summaries will be pushed");
+// Tracking starts now; the next summary (api::on_summary) pushes.
+fn start_search<R: Runtime>(app: &AppHandle<R>) {
+    crate::sharing::set(app, true);
+    println!("[friend-finding] on: tracking apps and Chrome, summaries will be pushed");
 }
 
-/// Stop being matchable right away instead of waiting for curr_task to go
-/// stale (11 minutes): DELETE /users/{id}/task.
+/// Stop tracking, and stop being matchable right away instead of waiting for
+/// curr_task to go stale (11 minutes): DELETE /users/{id}/task.
 fn stop_search<R: Runtime>(app: &AppHandle<R>) {
-    println!("[friend-finding] off: not pushing, removing your task from the backend");
+    crate::sharing::set(app, false);
+    println!("[friend-finding] off: not tracking, removing your task from the backend");
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(err) = crate::api::clear_backend_task(&app).await {
             eprintln!("[friend-finding] removing the task failed: {err}");
         }
     });
+}
+
+/// Quitting ends friend finding: tracking stops, and the task is taken off the
+/// backend before the process goes, so nobody is matched with an app that's
+/// gone. Blocks for at most EXIT_WAIT. Call from RunEvent::Exit.
+pub fn stop_for_exit<R: Runtime>(app: &AppHandle<R>) {
+    let Some(state) = app.try_state::<FriendFinding>() else {
+        return;
+    };
+    if !state.0.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    crate::sharing::set(app, false);
+    println!("[friend-finding] quitting: not tracking, removing your task from the backend");
+    let cleared = tauri::async_runtime::block_on(tokio::time::timeout(
+        EXIT_WAIT,
+        crate::api::clear_backend_task(app),
+    ));
+    match cleared {
+        Ok(Ok(_)) => {}
+        Ok(Err(err)) => eprintln!("[friend-finding] removing the task failed: {err}"),
+        Err(_) => eprintln!("[friend-finding] removing the task timed out; it expires on its own in 11 minutes"),
+    }
 }
 
 /// Animates the tray Earth for as long as the app runs: asleep (snoring, with

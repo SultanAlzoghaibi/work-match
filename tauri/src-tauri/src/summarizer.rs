@@ -351,14 +351,14 @@ pub async fn summarize_now(app: AppHandle) -> Result<ActivitySummary, String> {
     let llm = app.state::<Llm>().inner().clone();
     let dev = app.state::<DevState>().inner().clone();
     if !sharing.is_on() {
-        return Err("Share my activity is off: turn it on in the tray menu".into());
+        return Err("friend finding is off: turn it on to track what you're working on".into());
     }
     const WINDOW_MINUTES: u32 = 5;
     println!("[summarizer] summarize now (requested from the app)");
     let apps = recent_apps(crate::db::get_db_path(&app).as_deref(), WINDOW_MINUTES);
     let summary = run_once(&buffer, &sharing, &llm, &dev, &apps, WINDOW_MINUTES)
         .await
-        .ok_or("sharing was turned off while summarizing")?;
+        .ok_or("friend finding was turned off while summarizing")?;
     let _ = app.emit("activity-summary", &summary);
     crate::api::on_summary(&app, &summary);
     Ok(summary)

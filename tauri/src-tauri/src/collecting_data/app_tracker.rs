@@ -1,7 +1,7 @@
 // Records which app is in front, its focused window's title and the document
 // it has open, as timestamped rows in work_match.db (app_sessions). Runs every
-// POLL_EVERY while sharing is on (Thang's switch in sharing.rs) and keeps a
-// history; the 5-minute summary reads the recent rows (summarizer.rs).
+// POLL_EVERY while tracking is on (sharing.rs, which follows friend finding)
+// and keeps a history; the 5-minute summary reads the recent rows (summarizer.rs).
 //
 // macOS APIs:
 // - front app: NSWorkspace.frontmostApplication (no permission needed)

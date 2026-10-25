@@ -6,16 +6,21 @@ minutes, and a local Llama 3.2 model turns it into the two fields the backend st
 `curr_task`: a `topic` (`LeetCode`) and a one-sentence `task_summary` ("Working through
 graph problems on LeetCode"). Raw page text never leaves the laptop.
 
+Nothing is tracked unless the user turns **friend finding** on. It starts off every
+launch, turns off on quit and when the main window is closed (minimizing keeps it on),
+and turning it off stops the app tracker, the extension and the summarizer at once.
+
 ## Data flow
 
 ```
 Chrome (extension/)
   active tab of the focused window, on tab switch / page load / every minute
+  asks POST /status first: reads nothing unless the app is running with friend finding on
   Readability text, cut to 2000 chars, URL without query or fragment
         │ POST http://127.0.0.1:47321/capture
         ▼
 capture server (src-tauri/src/capture_server.rs)
-  Origin must be the extension → sharing must be on → body ≤ 64 KB → http(s) URL only
+  Origin must be the extension → tracking (friend finding) must be on → body ≤ 64 KB → http(s) URL only
   → keep host + path → scrub title, text and path → skip if text unchanged for that page
         ▼
 activity_buffer.sqlite, table captures (src-tauri/src/buffer.rs)
@@ -51,9 +56,10 @@ minutes, so they simply stop being matchable.
 
 ## Retention
 
-- **App start:** `captures` is emptied.
-- **Sharing turned off:** `captures` and `last_summary` are emptied, and new captures are
-  ignored until sharing is back on.
+- **App start:** `captures` is emptied, and friend finding (so tracking) is off.
+- **Friend finding turned off, the main window closed, or the app quits:** `captures` and `last_summary` are
+  emptied, the extension stops reading pages, new captures are ignored, and the task is
+  deleted from the backend (on quit the app waits up to 2 s for that).
 - **After every summary attempt:** exactly the rows it read are deleted
   (`id <= max_id_read`). This happens on success and on fallback.
 - **Every 60 s:** rows older than 6 minutes are deleted, whatever else happens.
@@ -63,9 +69,11 @@ minutes, so they simply stop being matchable.
 
 ## Privacy protections
 
-- **Extension:** never runs in incognito; only reads `http(s)` pages that aren't on
-  `localhost`; drops the query string and fragment; only captures while Chrome is the
-  focused app; stores nothing.
+- **Extension:** reads nothing unless the app answers `POST /status` with
+  `{"tracking": true}` (friend finding on), so it reads nothing while the app is closed;
+  never runs in incognito; only reads `http(s)` pages that aren't on `localhost`; drops
+  the query string and fragment; only captures while Chrome is the focused app; stores
+  nothing.
 - **Capture server:** listens on 127.0.0.1 only. It accepts only requests whose `Origin`
   is the extension, which stops web pages from writing into the buffer. It doesn't stop
   other programs on the same computer, but those could read the SQLite file directly
@@ -123,10 +131,10 @@ forced to `LeetCode` (`canonical_topic` in `summarizer.rs`).
 3. **Extension:** load `extension/` unpacked in Chrome (see
    [extension/README.md](../extension/README.md)). Its ID must be
    `cifmncfppiahnojgipabfaaifahknecg`.
-4. **Run:** `cd tauri && yarn tauri dev`. Activity sharing is always on, so the app tracker,
-   Chrome capture and summaries run while the app is open. **Friend finding** (in the tray
-   menu, or click the Earth on the Work friends tab) decides whether summaries are pushed to
-   the backend. While it's off, nothing leaves the laptop.
+4. **Run:** `cd tauri && yarn tauri dev`, then turn on **friend finding** (in the tray
+   menu, or click the Earth on the Work friends tab). Only then do the app tracker, Chrome
+   capture and summaries run, and summaries get pushed to the backend. While it's off,
+   nothing is tracked and nothing leaves the laptop. It is off at every launch.
 
 Only one instance can capture, because the ports are fixed. When you run two instances
 (`yarn dev1` and `yarn dev2`), the second one:
@@ -160,8 +168,9 @@ every 5 minutes.
 
 - Event `activity-summary`: the summary JSON above, once per summary.
 - Command `get_last_summary`: the latest summary, or `null`.
-- Commands `get_sharing` and `set_sharing({ enabled })`: the same switch as the tray
-  checkbox.
+- Command `get_sharing`: whether tracking is on (it follows friend finding).
+- Commands `get_friend_finding` and `set_friend_finding({ enabled })`: the same switch as
+  the tray checkbox; event `friend-finding` when it changes.
 
 ## Check it by hand
 
