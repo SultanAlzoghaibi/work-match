@@ -15,14 +15,14 @@ export const MOCK_TASKS = {
     ],
   },
   apartment: {
-    label: "Apartment hunting (NYC)",
+    label: "Apartment hunting (SF)",
     topic: "Apartment hunting",
     summaries: [
-      "Searching StreetEasy for a one-bedroom apartment in Brooklyn under $3,000 a month. Comparing listings in Bushwick and Crown Heights and checking commute times to Midtown.",
-      "Looking for a room in a shared apartment in Manhattan for the summer. Scrolling Facebook housing groups and Listings Project, and messaging people about sublets in the East Village.",
-      "Apartment hunting in New York City: filtering no-fee listings in Astoria and Long Island City, Queens. Building a spreadsheet of rent, square footage and distance to the subway.",
-      "Trying to find an NYC apartment before a lease starts next month. Reading about broker fees and guarantor services, and booking viewings for studios in Harlem and Washington Heights.",
-      "Researching neighborhoods in New York for a first apartment after graduating. Comparing rent prices in Jersey City and Brooklyn, and checking reviews of landlords and buildings.",
+      "Searching Zillow for a one-bedroom apartment in San Francisco under $3,200 a month. Comparing listings in the Mission and Inner Sunset and checking commute times to SoMa.",
+      "Looking for a room in a shared apartment in San Francisco for the summer. Scrolling Facebook housing groups and Craigslist, and messaging people about sublets near Hayes Valley.",
+      "Apartment hunting in San Francisco: filtering pet-friendly listings in the Richmond and Noe Valley. Building a spreadsheet of rent, square footage and distance to BART and Muni.",
+      "Trying to find an SF apartment before a lease starts next month. Reading about application fees and renter's insurance, and booking viewings for studios in Nob Hill and the Tenderloin.",
+      "Researching neighborhoods in San Francisco for a first apartment after graduating. Comparing rent prices in Oakland and the Sunset, and checking reviews of landlords and buildings.",
     ],
   },
 };
