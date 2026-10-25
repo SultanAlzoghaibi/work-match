@@ -108,10 +108,67 @@ const NOT_COURSE_WORK: [&str; 3] = ["Job hunting", "Apartment hunting", "Shoppin
 /// LeetCode on screen + a coding or studying topic means interview practice. The model
 /// is easily led by problem names ("Course Schedule" → Coursework).
 fn leetcode_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Option<String> {
-    let on_leetcode = captures.iter().any(|capture| capture.host.ends_with("leetcode.com"))
-        || apps.iter().any(|app| app.window_title.as_deref().is_some_and(|title| title.contains("LeetCode")));
+    // NeetCode is LeetCode's problems in roadmap order, so both are one topic.
+    let on_leetcode = captures.iter().any(|capture| capture.host.ends_with("leetcode.com") || capture.host.ends_with("neetcode.io"))
+        || apps.iter().any(|app| {
+            app.window_title.as_deref().is_some_and(|title| title.contains("LeetCode") || title.contains("NeetCode"))
+        });
     let coding_or_studying = ["Coding", "Web development", "App development", "Studying", "Coursework"];
     (on_leetcode && coding_or_studying.contains(&topic)).then(|| "LeetCode".to_string())
+}
+
+/// Sites whose pages are job listings (LinkedIn only under /jobs). A subdomain
+/// counts: boards.greenhouse.io, jobs.lever.co, acme.myworkdayjobs.com.
+const JOB_BOARDS: [&str; 11] = [
+    "indeed.com", "glassdoor.com", "jobright.ai", "joinhandshake.com", "wellfound.com", "greenhouse.io",
+    "lever.co", "ashbyhq.com", "myworkdayjobs.com", "ziprecruiter.com", "simplify.jobs",
+];
+const BROWSERS: [&str; 6] = ["Chrome", "Edge", "Brave", "Arc", "Opera", "Vivaldi"];
+
+fn is_job_board(capture: &Capture) -> bool {
+    let host = capture.host.to_lowercase();
+    if host == "linkedin.com" || host.ends_with(".linkedin.com") {
+        return capture.path.starts_with("/jobs");
+    }
+    JOB_BOARDS.iter().any(|board| host == *board || host.ends_with(&format!(".{board}")))
+}
+
+/// Mostly job listings in the browser means Job hunting, whatever the postings are
+/// for: the model calls a research posting Research and writes its duties as the
+/// person's task. Not when another app had more time (a glance while coding), and
+/// not Writing (a cover letter next to the posting).
+fn job_topic(topic: &str, captures: &[Capture], apps: &[AppSession]) -> Option<String> {
+    let boards = captures.iter().filter(|capture| is_job_board(capture)).count();
+    if topic == "Writing" || boards * 2 <= captures.len() {
+        return None;
+    }
+    let time_in = |browser: bool| -> i64 {
+        apps.iter()
+            .filter(|app| app.app_name.split_whitespace().any(|word| BROWSERS.contains(&word)) == browser)
+            .map(|app| (app.ended_at - app.started_at).max(0))
+            .sum()
+    };
+    (time_in(true) >= time_in(false)).then(|| "Job hunting".to_string())
+}
+
+/// A screen rule that moved the topic means the model read the page as the person's
+/// own work ("Designing system architecture for GPU platforms" for a job posting, a
+/// problem statement for practice), so that summary is replaced unless it already
+/// says what they're doing. It's what the matched stranger reads and Jev compares.
+fn summary_after_screen_rule(topic: &str, focus: &str, task_summary: &str) -> Option<String> {
+    let (says_it, plain) = match topic {
+        "Job hunting" => (
+            ["job", "role", "position", "intern", "hiring", "career"],
+            if focus.is_empty() { "Browsing job listings".to_string() } else { format!("Browsing job listings for {focus} roles") },
+        ),
+        "LeetCode" => (
+            ["leetcode", "problem", "practic", "interview", "algorithm", "data structure"],
+            if focus.is_empty() { "Practicing LeetCode problems".to_string() } else { format!("Practicing LeetCode problems: {focus}") },
+        ),
+        _ => return None,
+    };
+    let summary = task_summary.to_lowercase();
+    (!says_it.iter().any(|words| summary.contains(words))).then_some(plain)
 }
 
 /// Coursework or studying for a course named on screen gets the course as its topic,
@@ -403,21 +460,27 @@ where
         match output {
             Ok(output) => {
                 return match clean(output) {
-                    Some((topic, activity, focus, task_summary)) => ActivitySummary {
-                        shareable: true,
-                        focus,
-                        topic: {
-                            let reconciled = reconcile_topic(&topic, &activity);
-                            leetcode_topic(&topic, &captures, &apps)
-                                .or_else(|| leetcode_topic(&reconciled, &captures, &apps))
-                                .or_else(|| course_topic(&reconciled, &captures, &apps))
-                                .unwrap_or(reconciled)
-                        },
-                        task_summary,
-                        source: Source::Llama,
-                        window_minutes,
-                        created_at: now,
-                    },
+                    Some((topic, activity, focus, task_summary)) => {
+                        let reconciled = reconcile_topic(&topic, &activity);
+                        let ruled = leetcode_topic(&topic, &captures, &apps)
+                            .or_else(|| leetcode_topic(&reconciled, &captures, &apps))
+                            .or_else(|| job_topic(&reconciled, &captures, &apps))
+                            .or_else(|| course_topic(&reconciled, &captures, &apps));
+                        let task_summary = ruled
+                            .as_deref()
+                            .filter(|ruled| *ruled != reconciled)
+                            .and_then(|ruled| summary_after_screen_rule(ruled, &focus, &task_summary))
+                            .unwrap_or(task_summary);
+                        ActivitySummary {
+                            shareable: true,
+                            focus,
+                            topic: ruled.unwrap_or(reconciled),
+                            task_summary,
+                            source: Source::Llama,
+                            window_minutes,
+                            created_at: now,
+                        }
+                    }
                     None => ActivitySummary::not_shareable(Source::Llama, now, window_minutes),
                 }
             }
@@ -446,12 +509,16 @@ fn build_prompt(captures: &[Capture], apps: &[AppSession]) -> String {
             continue;
         }
         let text: String = capture.text.chars().take(MAX_CAPTURE_CHARS).collect();
+        // Said next to the page, where a small model reads it: the posting's duties
+        // aren't the person's task.
+        let note = if is_job_board(capture) { " (job listings they are browsing, not their own work)" } else { "" };
         let entry = format!(
-            "\n[{}] {}{} | {}\n{}\n",
+            "\n[{}] {}{} | {}{}\n{}\n",
             clock_time(capture.captured_at),
             capture.host,
             capture.path.trim_end_matches('/'),
             capture.title,
+            note,
             text
         );
         let entry_chars = entry.chars().count();
@@ -936,6 +1003,66 @@ mod tests {
         assert_eq!(leetcode_topic("Coursework", &captures, &[]).as_deref(), Some("LeetCode"));
         assert_eq!(leetcode_topic("Job hunting", &captures, &[]), None);
         assert_eq!(leetcode_topic("Coding", &[], &[]), None);
+        let neetcode = [capture(1, "neetcode.io", "/problems/meeting-schedule", "Meeting Schedule - NeetCode", "")];
+        assert_eq!(leetcode_topic("Coding", &neetcode, &[]).as_deref(), Some("LeetCode"));
+        let neetcode_tab = [app("Google Chrome", "Meeting Schedule - NeetCode", 0, 60_000)];
+        assert_eq!(leetcode_topic("Web development", &[], &neetcode_tab).as_deref(), Some("LeetCode"));
+    }
+
+    #[test]
+    fn job_boards_are_job_hunting_whatever_the_posting() {
+        let posting = |id, host: &str, path: &str| capture(id, host, path, "Research Intern jobs", "Research Scientist Intern");
+        let linkedin = [posting(1, "www.linkedin.com", "/jobs/search/"), posting(2, "boards.greenhouse.io", "/acme/jobs/1")];
+        let chrome = [app("Google Chrome", "", 0, 240_000), app("Code", "main.rs", 0, 60_000)];
+        assert_eq!(job_topic("Research", &linkedin, &chrome).as_deref(), Some("Job hunting"));
+        assert_eq!(job_topic("Coding", &linkedin, &[]).as_deref(), Some("Job hunting"));
+        // A cover letter next to the posting stays Writing.
+        assert_eq!(job_topic("Writing", &linkedin, &chrome), None);
+        // A glance at jobs while another app had most of the time.
+        let coding = [app("Google Chrome", "", 0, 60_000), app("Code", "main.rs", 0, 240_000)];
+        assert_eq!(job_topic("Coding", &linkedin, &coding), None);
+        // Job pages aren't most of the pages.
+        let mixed = [posting(1, "www.linkedin.com", "/jobs/view/4012345/"), posting(2, "react.dev", "/learn"), posting(3, "github.com", "/")];
+        assert_eq!(job_topic("Coding", &mixed, &chrome), None);
+        // LinkedIn outside /jobs is not a job board.
+        assert!(!is_job_board(&posting(1, "www.linkedin.com", "/feed/")));
+        assert!(is_job_board(&posting(1, "acme.myworkdayjobs.com", "/en-US/careers")));
+    }
+
+    #[tokio::test]
+    async fn a_moved_topic_replaces_a_summary_of_the_page() {
+        let model = |topic: &'static str, focus: &'static str, task_summary: &'static str| {
+            move |_| async move {
+                Ok(json!({ "shareable": true, "topic": topic, "activity": topic, "focus": focus, "task_summary": task_summary })
+                    .to_string())
+            }
+        };
+        let chrome = [app("Google Chrome", "", 0, 300_000)];
+        let linkedin = [capture(1, "www.linkedin.com", "/jobs/search/", "(2) Research Intern jobs | LinkedIn", "Research Scientist Intern")];
+        // The posting's duties, written as the person's task.
+        let duties = summarize(&linkedin, &chrome, NOW, 5, model("Research", "Recommendation Systems", "Developing large-scale ranking models")).await;
+        assert_eq!((duties.topic.as_str(), duties.task_summary.as_str()), ("Job hunting", "Browsing job listings for Recommendation Systems roles"));
+        // Already about the search: kept.
+        let search = summarize(&linkedin, &chrome, NOW, 5, model("Research", "Research internships", "Looking for research internships")).await;
+        assert_eq!(search.task_summary, "Looking for research internships");
+
+        let neetcode = [capture(1, "neetcode.io", "/problems/meeting-schedule", "Meeting Schedule - NeetCode", "Given an array of meeting time intervals")];
+        let statement = summarize(&neetcode, &chrome, NOW, 5, model("Coding", "Meeting Schedule", "Determining if a person can attend all meetings")).await;
+        assert_eq!((statement.topic.as_str(), statement.task_summary.as_str()), ("LeetCode", "Practicing LeetCode problems: Meeting Schedule"));
+        // The model already said LeetCode, so no rule moved the topic: its summary stands.
+        let solving = summarize(&neetcode, &chrome, NOW, 5, model("LeetCode", "Meeting Schedule", "Checking meeting conflicts")).await;
+        assert_eq!(solving.task_summary, "Checking meeting conflicts");
+    }
+
+    #[test]
+    fn job_listings_are_labelled_in_the_prompt() {
+        let captures = [
+            capture(1, "www.linkedin.com", "/jobs/search/", "(2) Research Intern jobs | LinkedIn", "Research Scientist Intern"),
+            capture(2, "react.dev", "/learn", "Quick Start - React", "Components"),
+        ];
+        let prompt = build_prompt(&captures, &[]);
+        assert!(prompt.contains("Research Intern jobs | LinkedIn (job listings they are browsing, not their own work)"));
+        assert!(prompt.contains("Quick Start - React\n"));
     }
 
     #[test]
