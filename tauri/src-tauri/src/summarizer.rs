@@ -42,11 +42,11 @@ does. Decide by what the person is doing, not by the tools, commands or apps on 
 "focus": 2 to 4 words naming the specific subject inside that topic: the project,
 problem, concept, course material or place they are working on. Never a tool, app,
 website, command or file name, and never just the topic again.
-"task_summary": a description, under 500 words, that a stranger will read before working
-alongside them. There is no set length: write as much as it takes to explain the task. Describe the task itself, not the pages visited: what they are making,
-solving, learning or looking for, the specific subject, where they are in it (just starting,
-stuck on a step, reviewing, almost done) and what they are trying to get done. Never copy a
-page title, and never name an app, website, tool, command or file, except LeetCode and Figma.
+"task_summary": a concise, truthful description of the task they are doing, for a stranger
+who might work alongside them: what they are making, solving, learning or looking for, and
+the specific subject. Only state what the apps and pages show; don't guess or add details.
+Never copy a page title, and never name an app, website, tool, command or file, except
+LeetCode and Figma.
 Pick the dominant activity. NEVER include names, emails, phone numbers, addresses,
 prices, URLs, account details, message contents, or anything that identifies anyone.
 Ignore email, messaging, banking, and health pages; never describe them.
@@ -177,9 +177,9 @@ const MAX_PROMPT_CHARS: usize = 6000;
 const MAX_CAPTURE_CHARS: usize = 800;
 const MAX_TOPIC_WORDS: usize = 3;
 const MAX_TOPIC_CHARS: usize = 40;
-// The prompt asks for under 500 words and sets no length; this only stops a
-// runaway reply. Keep it at or below the backend's TaskPush.task_summary limit.
-const MAX_SUMMARY_CHARS: usize = 4000;
+// The prompt asks for a concise description and gives no length; this only
+// stops a runaway reply (backend TaskPush.task_summary allows up to 4000).
+const MAX_SUMMARY_CHARS: usize = 400;
 const MODEL_ATTEMPTS: usize = 2;
 /// How long the first summaries wait for llama-server to finish loading.
 const READY_WAIT: Duration = Duration::from_secs(90);
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn clean_truncates_long_fields() {
-        let long_summary = "Working through graph problems ".repeat(200);
+        let long_summary = "Working through graph problems ".repeat(20);
         let (topic, _activity, _focus, task_summary) =
             clean(output(true, "graph algorithms practice for interviews", &long_summary)).unwrap();
         assert_eq!(topic, "graph algorithms practice");

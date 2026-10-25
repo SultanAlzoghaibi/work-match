@@ -166,9 +166,9 @@ impl Llm {
                 { "role": "user", "content": user },
             ],
             "temperature": 0,
-            // Room for a task_summary of up to ~500 words plus the short fields;
-            // still fits the 4096-token context (-c) with the prompt.
-            "max_tokens": 1000,
+            // A concise task_summary plus the short fields fit easily; this only
+            // stops a runaway reply.
+            "max_tokens": 400,
             "stream": false,
             "response_format": { "type": "json_object", "schema": schema },
         });
